@@ -6,31 +6,19 @@ require('dotenv').config({ path: './config.env' });
 
 const app = express();
 
-// Import routes
-const authRoutes = require('./routes/auth');
-const eventsRoutes = require('./routes/events');
-const categoriesRoutes = require('./routes/categories');
-const registrationsRoutes = require('./routes/registrations');
-
 // Security middleware
 app.use(helmet());
-
-// CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
-    : ['http://localhost:5173', 'http://localhost:3000'],
-  credentials: true
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  }
+  max: 100 // limit each IP to 100 requests per windowMs
 });
 app.use('/api/', limiter);
 
@@ -38,50 +26,54 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files
-app.use('/uploads', express.static('uploads'));
-
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
-    success: true,
+    status: 'OK',
     message: 'Server is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// API routes
+// Import routes
+const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
+const eventRoutes = require('./routes/events');
+const categoryRoutes = require('./routes/categories');
+const registrationRoutes = require('./routes/registrations');
+
+// Use routes
 app.use('/api/auth', authRoutes);
-app.use('/api/events', eventsRoutes);
-app.use('/api/categories', categoriesRoutes);
-app.use('/api/registrations', registrationsRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/registrations', registrationRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: 'API endpoint not found',
-    path: req.originalUrl
+    message: 'Route not found'
   });
 });
 
 // Global error handler
-app.use((err, req, res, next) => {
-  console.error('Global error handler:', err);
-  
-  res.status(err.status || 500).json({
+app.use((error, req, res, next) => {
+  console.error('Global error:', error);
+  res.status(500).json({
     success: false,
-    message: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { error: error.message })
   });
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server berjalan di http://localhost:${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
-  console.log(`💾 Database: ${process.env.DB_NAME || 'event_db'}`);
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
+
+module.exports = app;

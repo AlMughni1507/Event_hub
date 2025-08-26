@@ -27,18 +27,16 @@ pool.getConnection((err, connection) => {
   connection.release();
 });
 
+// Use promisePool for consistent API
 module.exports = {
   pool,
   promisePool,
-  query: (sql, params) => {
-    return new Promise((resolve, reject) => {
-      pool.query(sql, params, (error, results) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(results);
-        }
-      });
-    });
+  query: async (sql, params) => {
+    try {
+      const [rows] = await promisePool.execute(sql, params);
+      return [rows];
+    } catch (error) {
+      throw error;
+    }
   }
 };

@@ -1,415 +1,201 @@
 # Event Management System
 
-Sistem manajemen event yang lengkap dengan backend API dan frontend React.
+Sistem manajemen event dengan fitur autentikasi, OTP email, dan dashboard admin terpisah.
 
-## 🚀 Quick Start
+## Fitur Utama
 
-### Cara Termudah (Windows)
-1. **Double click** `start-server.bat` untuk menjalankan backend
-2. **Double click** `start-frontend.bat` untuk menjalankan frontend
+### 🔐 Autentikasi & Keamanan
+- **Login Multi-Role**: Admin dan User/Visitor
+- **Registrasi dengan OTP**: Verifikasi email wajib untuk visitor
+- **JWT Authentication**: Token-based security
+- **Role-based Access**: Pembatasan akses berdasarkan role
 
-### Cara Manual
+### 👥 User Management
+- **Admin**: `admin@gmail.com` / `admin123` (username dan email sama)
+- **Visitor**: Wajib register dengan OTP email
+- **User Activation**: Akun visitor harus diverifikasi via OTP
+
+### 🎯 Admin Dashboard (AdminLTE)
+- **Dashboard Stats**: Total users, events, categories, registrations
+- **User Management**: CRUD users, aktivasi/deaktivasi
+- **Event Management**: CRUD events dan categories
+- **Registration Management**: Lihat semua registrasi
+- **Reports**: Laporan events dan users
+
+### 🌐 Frontend
+- **Tampilan Utama**: Design modern untuk visitor
+- **Admin Panel**: AdminLTE design terpisah
+- **Responsive**: Mobile-friendly
+
+## Struktur Folder
+
+```
+ujikom-web-event/
+├── frontend/                 # React Frontend
+│   ├── src/
+│   │   ├── components/
+│   │   │   └── admin/       # AdminLTE Components
+│   │   ├── pages/
+│   │   │   ├── main/        # Tampilan Utama
+│   │   │   ├── events/      # Halaman Events
+│   │   │   ├── auth/        # Login & Register
+│   │   │   └── admin/       # Admin Dashboard
+│   │   └── styles/
+│   │       └── admin.css    # AdminLTE Styles
+├── server/                  # Node.js Backend
+│   ├── routes/
+│   │   ├── auth.js         # Authentication
+│   │   ├── events.js       # Events API
+│   │   └── admin.js        # Admin API
+│   ├── middleware/         # Auth & Validation
+│   ├── utils/              # Email & Utilities
+│   └── migrations/         # Database Migrations
+```
+
+## Setup & Instalasi
+
+### 1. Database Setup
+```sql
+-- Jalankan semua file di folder server/migrations/
+-- Urutan: 001, 002, 003, dst.
+```
+
+### 2. Environment Variables
+Buat file `server/config.env`:
+```env
+# Database
+DB_HOST=127.0.0.1
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=event_db
+
+# JWT
+JWT_SECRET=your-secret-key
+JWT_EXPIRES_IN=24h
+
+# Email (untuk OTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+SMTP_FROM_EMAIL=no-reply@example.com
+
+# Admin Seed
+ADMIN_SEED_KEY=change-this-seed-key
+```
+
+### 3. Install Dependencies
 ```bash
 # Backend
 cd server
 npm install
-npm run dev
 
-# Frontend (di terminal baru)
+# Frontend
 cd frontend
 npm install
-npm run dev
 ```
 
-## 🚀 Fitur
-
-### Backend API
-- ✅ Authentication dengan JWT
-- ✅ CRUD Events
-- ✅ CRUD Categories  
-- ✅ Event Registration
-- ✅ User Management
-- ✅ Role-based Authorization
-- ✅ Input Validation
-- ✅ Error Handling
-- ✅ Database Migration
-- ✅ Security Middleware
-
-### Frontend React
-- ✅ React 19 + Vite
-- ✅ Tailwind CSS v4
-- ✅ Responsive Design
-- ✅ Modern UI Components
-- ✅ Custom Animations
-
-## 📁 Struktur Project
-
-```
-ujikom-web-event/
-├── start-server.bat          # Script untuk menjalankan server
-├── start-frontend.bat        # Script untuk menjalankan frontend
-├── start-server.ps1          # PowerShell script untuk server
-├── start-frontend.ps1        # PowerShell script untuk frontend
-├── CARA_MENJALANKAN.md       # Dokumentasi cara menjalankan
-├── frontend/                 # React Frontend
-│   ├── src/
-│   ├── public/
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   └── package.json
-├── server/                   # Node.js Backend
-│   ├── routes/              # API Routes
-│   ├── middleware/          # Middleware
-│   ├── migrations/          # Database Migrations
-│   ├── utils/               # Utilities
-│   ├── uploads/             # File Uploads
-│   └── package.json
-└── README.md
-```
-
-## 🛠️ Tech Stack
-
-### Backend
-- **Node.js** - Runtime environment
-- **Express.js** - Web framework
-- **MySQL** - Database
-- **JWT** - Authentication
-- **bcryptjs** - Password hashing
-- **express-validator** - Input validation
-- **helmet** - Security headers
-- **cors** - Cross-origin resource sharing
-
-### Frontend
-- **React 19** - UI library
-- **Vite** - Build tool
-- **Tailwind CSS v4** - CSS framework
-- **PostCSS** - CSS processor
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js (v18+)
-- MySQL (v8+)
-- npm atau yarn
-
-### 1. Setup Database
+### 4. Seed Admin
 ```bash
-cd server
-npm run setup
+# Di folder server
+Invoke-RestMethod -Method POST `
+  -Uri "http://localhost:3000/api/auth/seed-admin" `
+  -ContentType "application/json" `
+  -Body (@{
+    key = "change-this-seed-key"
+    username = "admin@gmail.com"
+    email = "admin@gmail.com"
+    password = "admin123"
+    full_name = "System Administrator"
+  } | ConvertTo-Json)
 ```
 
-### 2. Jalankan Backend
+### 5. Run Application
 ```bash
-# Cara 1: Double click start-server.bat
-# Cara 2: Manual
+# Terminal 1 - Backend
 cd server
 npm run dev
-```
 
-### 3. Jalankan Frontend
-```bash
-# Cara 1: Double click start-frontend.bat
-# Cara 2: Manual
+# Terminal 2 - Frontend
 cd frontend
 npm run dev
 ```
 
-## 📊 Database Setup
-
-### 1. Buat Database
-```bash
-cd server
-npm run create-db
-```
-
-### 2. Jalankan Migrations
-```bash
-npm run migrate
-```
-
-### 3. Default Admin User
-Setelah migration, tersedia user admin default:
-- **Email**: admin@eventapp.com
-- **Password**: admin123
-- **Role**: admin
-
-## 🔧 Configuration
-
-### Backend Environment
-Buat file `server/config.env`:
-```env
-# Database Configuration
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=event_db
-DB_PORT=3306
-
-# Server Configuration
-PORT=3000
-NODE_ENV=development
-
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_EXPIRES_IN=24h
-
-# File Upload Configuration
-UPLOAD_PATH=./uploads
-MAX_FILE_SIZE=5242880
-```
-
-## 📚 API Documentation
-
-### Base URL
-```
-http://localhost:3000/api
-```
-
-### Endpoints
-
-#### Authentication
-- `POST /auth/register` - Register user
-- `POST /auth/login` - Login user
-- `GET /auth/profile` - Get profile
-- `PUT /auth/profile` - Update profile
-- `PUT /auth/change-password` - Change password
-
-#### Events
-- `GET /events` - Get all events
-- `GET /events/featured` - Get featured events
-- `GET /events/:id` - Get event by ID
-- `POST /events` - Create event (organizer/admin)
-- `PUT /events/:id` - Update event (organizer/admin)
-- `DELETE /events/:id` - Delete event (organizer/admin)
-
-#### Categories
-- `GET /categories` - Get all categories
-- `GET /categories/:id` - Get category by ID
-- `POST /categories` - Create category (admin)
-- `PUT /categories/:id` - Update category (admin)
-- `DELETE /categories/:id` - Delete category (admin)
-
-#### Registrations
-- `POST /registrations` - Register for event
-- `GET /registrations/my-registrations` - Get my registrations
-- `GET /registrations/event/:id` - Get event registrations (organizer/admin)
-- `PUT /registrations/:id/status` - Update registration status (organizer/admin)
-- `PUT /registrations/:id/cancel` - Cancel registration
+## API Endpoints
 
 ### Authentication
-Semua endpoint yang memerlukan authentication menggunakan JWT Bearer token:
-```
-Authorization: Bearer <your-jwt-token>
-```
+- `POST /api/auth/register` - Register visitor
+- `POST /api/auth/request-email-otp` - Request OTP
+- `POST /api/auth/verify-email` - Verify OTP
+- `POST /api/auth/login/user` - Login visitor
+- `POST /api/auth/login/admin` - Login admin
+- `POST /api/auth/seed-admin` - Create admin (one-time)
 
-## 🎨 Frontend Features
+### Admin (Protected)
+- `GET /api/admin/dashboard-stats` - Dashboard statistics
+- `GET /api/admin/users` - Get all users
+- `GET /api/admin/events` - Get all events
+- `GET /api/admin/categories` - Get all categories
+- `GET /api/admin/registrations` - Get all registrations
+- `POST /api/admin/categories` - Create category
+- `PUT /api/admin/categories/:id` - Update category
+- `DELETE /api/admin/categories/:id` - Delete category
+- `PUT /api/admin/users/:id/status` - Update user status
+- `DELETE /api/admin/users/:id` - Delete user
 
-### Tailwind CSS Components
-- `.btn-primary` - Primary button
-- `.btn-secondary` - Secondary button
-- `.btn-outline` - Outline button
-- `.card` - Card component
-- `.input-field` - Input field
-- `.form-label` - Form label
-- `.badge` - Badge component
+### Events (Public)
+- `GET /api/events` - Get all events
+- `GET /api/events/:id` - Get event detail
+- `GET /api/events/featured` - Get featured events
 
-### Custom Colors
-- `primary-{50-950}` - Primary color palette
-- `secondary-{50-950}` - Secondary color palette
+## User Flow
 
-### Custom Animations
-- `animate-fade-in` - Fade in animation
-- `animate-slide-up` - Slide up animation
-- `animate-bounce-gentle` - Gentle bounce animation
+### Visitor
+1. **Register** → Isi form pendaftaran
+2. **OTP Verification** → Cek email, masukkan OTP
+3. **Login** → Akses tampilan utama
+4. **Browse Events** → Lihat dan daftar event
 
-## 🔒 Security Features
+### Admin
+1. **Login** → `admin@gmail.com` / `admin123`
+2. **Dashboard** → Akses admin panel
+3. **Management** → Kelola users, events, categories
+4. **Reports** → Lihat laporan dan statistik
 
-- JWT Authentication
-- Password hashing dengan bcryptjs
-- Input validation dengan express-validator
-- Security headers dengan helmet
-- Rate limiting
-- CORS protection
-- SQL injection protection
+## Teknologi
 
-## 📝 Scripts
+### Frontend
+- React 19
+- React Router DOM
+- Tailwind CSS
+- AdminLTE (untuk admin panel)
+- Font Awesome
 
-### Backend Scripts
-```bash
-npm run dev          # Start development server
-npm run start        # Start production server
-npm run create-db    # Create database
-npm run migrate      # Run migrations
-npm run setup        # Setup database and migrations
-```
+### Backend
+- Node.js
+- Express.js
+- MySQL
+- JWT
+- Nodemailer (OTP)
+- bcryptjs
 
-### Frontend Scripts
-```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run preview      # Preview production build
-```
+## Troubleshooting
 
-## 🧪 Testing API
+### Email OTP tidak terkirim
+1. Pastikan SMTP settings benar
+2. Gunakan App Password untuk Gmail
+3. Cek spam folder
 
-### Health Check
-```bash
-curl http://localhost:3000/api/health
-```
+### Database connection error
+1. Pastikan MySQL running
+2. Cek credentials di config.env
+3. Pastikan database `event_db` sudah dibuat
 
-### Register User
-```bash
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "email": "test@example.com",
-    "password": "Password123",
-    "full_name": "Test User",
-    "phone": "081234567890"
-  }'
-```
+### Admin login gagal
+1. Pastikan admin sudah di-seed
+2. Cek username/email: `admin@gmail.com`
+3. Password: `admin123`
 
-### Login
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "Password123"
-  }'
-```
+## License
 
-## 🐛 Troubleshooting
-
-### Database Connection Error
-- Pastikan MySQL server berjalan
-- Periksa konfigurasi database di `config.env`
-- Jalankan `npm run create-db` untuk membuat database
-
-### Port Already in Use
-- Ubah port di `config.env`
-- Atau kill process yang menggunakan port tersebut
-
-### Module Not Found
-- Jalankan `npm install` di folder server dan frontend
-- Pastikan semua dependencies terinstal
-
-### Server tidak berjalan
-1. Pastikan MySQL server berjalan
-2. Jalankan `npm run setup` di folder server
-3. Pastikan port 3000 tidak digunakan aplikasi lain
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📞 Support
-
-Jika ada pertanyaan atau masalah, silakan buat issue di repository ini.
-
-## ✅ Status Project
-
-- ✅ Backend API: Berjalan di port 3000
-- ✅ Frontend: Berjalan di port 5173
-- ✅ Database: MySQL dengan 6 tabel
-- ✅ Authentication: JWT dengan bcryptjs
-- ✅ Security: Helmet, CORS, rate limiting
-- ✅ Documentation: Lengkap
-
-**Status: READY FOR DEVELOPMENT** 🚀
-
-3. Pastikan port 3000 tidak digunakan aplikasi lain
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📞 Support
-
-Jika ada pertanyaan atau masalah, silakan buat issue di repository ini.
-
-## ✅ Status Project
-
-- ✅ Backend API: Berjalan di port 3000
-- ✅ Frontend: Berjalan di port 5173
-- ✅ Database: MySQL dengan 6 tabel
-- ✅ Authentication: JWT dengan bcryptjs
-- ✅ Security: Helmet, CORS, rate limiting
-- ✅ Documentation: Lengkap
-
-**Status: READY FOR DEVELOPMENT** 🚀
-
-3. Pastikan port 3000 tidak digunakan aplikasi lain
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📞 Support
-
-Jika ada pertanyaan atau masalah, silakan buat issue di repository ini.
-
-## ✅ Status Project
-
-- ✅ Backend API: Berjalan di port 3000
-- ✅ Frontend: Berjalan di port 5173
-- ✅ Database: MySQL dengan 6 tabel
-- ✅ Authentication: JWT dengan bcryptjs
-- ✅ Security: Helmet, CORS, rate limiting
-- ✅ Documentation: Lengkap
-
-**Status: READY FOR DEVELOPMENT** 🚀
-
-3. Pastikan port 3000 tidak digunakan aplikasi lain
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📞 Support
-
-Jika ada pertanyaan atau masalah, silakan buat issue di repository ini.
-
-## ✅ Status Project
-
-- ✅ Backend API: Berjalan di port 3000
-- ✅ Frontend: Berjalan di port 5173
-- ✅ Database: MySQL dengan 6 tabel
-- ✅ Authentication: JWT dengan bcryptjs
-- ✅ Security: Helmet, CORS, rate limiting
-- ✅ Documentation: Lengkap
-
-**Status: READY FOR DEVELOPMENT** 🚀
+MIT License
