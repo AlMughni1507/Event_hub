@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config({ path: './config.env' });
 
 const app = express();
@@ -26,6 +27,9 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -42,13 +46,24 @@ const adminRoutes = require('./routes/admin');
 const eventRoutes = require('./routes/events');
 const categoryRoutes = require('./routes/categories');
 const registrationRoutes = require('./routes/registrations');
+const userRoutes = require('./routes/users');
+const analyticsRoutes = require('./routes/analytics');
+const articlesRoutes = require('./routes/articles');
+const contactsRoutes = require('./routes/contacts');
+const uploadRoutes = require('./routes/upload');
+const paymentRoutes = require('./routes/payments');
 
 // Use routes
 app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/registrations', registrationRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/articles', articlesRoutes);
+app.use('/api/contacts', contactsRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
