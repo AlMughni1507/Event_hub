@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { eventsAPI, categoriesAPI } from '../../services/api';
+import FallingStars from '../../components/FallingStars';
 
 const EventsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -101,6 +102,8 @@ const EventsPage = () => {
 
   return (
     <div className="min-h-screen bg-deep-space relative overflow-hidden">
+      {/* Falling Stars Background */}
+      <FallingStars density="medium" />
       {/* Cosmic Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-20 w-96 h-96 bg-comet-cyan/10 rounded-full blur-3xl animate-cosmic-pulse"></div>

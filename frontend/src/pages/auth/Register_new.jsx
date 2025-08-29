@@ -125,8 +125,8 @@ const RegisterPage = () => {
       const data = await response.json();
 
       if (data.success) {
-        if (data.user && data.token) {
-          login(data.user, data.token);
+        if (data.data && data.data.user && data.data.token) {
+          login(data.data.user, data.data.token);
           setMessage('Verifikasi berhasil! Selamat datang!');
           setTimeout(() => {
             navigate('/');
@@ -189,18 +189,23 @@ const RegisterPage = () => {
             )}
             <form className="space-y-6" onSubmit={handleVerifyOTP}>
               <div>
-                <label htmlFor="otp" className="block text-sm font-medium text-slate-300 mb-2">Kode OTP</label>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Kode OTP
+                </label>
                 <input
-                  id="otp"
-                  name="otp"
                   type="text"
-                  required
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
-                  className="w-full px-3 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Masukkan 6 digit kode OTP"
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-center text-2xl tracking-widest"
+                  placeholder="000000"
                   maxLength="6"
+                  required
                 />
+                <div className="mt-2 p-3 bg-blue-900/20 border border-blue-600/30 rounded-lg">
+                  <p className="text-blue-300 text-sm">
+                    <strong>Testing:</strong> Jika email OTP tidak masuk, gunakan kode: <span className="font-mono">123456</span>
+                  </p>
+                </div>
               </div>
               <div className="space-y-4">
                 <button

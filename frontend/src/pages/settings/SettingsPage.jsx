@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import FallingStars from '../../components/FallingStars';
 
 const SettingsPage = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -22,6 +23,8 @@ const SettingsPage = () => {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-space relative overflow-hidden">
+        {/* Falling Stars Background */}
+        <FallingStars density="light" />
         {/* Enhanced Space Background */}
         <div className="absolute inset-0 bg-gradient-space">
           {/* Large cosmic nebulae */}
@@ -113,6 +116,8 @@ const SettingsPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black">
+      {/* Falling Stars Background */}
+      <FallingStars density="light" />
       {/* Navigation */}
       <div className="bg-black/20 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

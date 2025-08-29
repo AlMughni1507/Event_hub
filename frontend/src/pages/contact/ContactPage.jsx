@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import FallingStars from '../../components/FallingStars';
 
 const ContactPage = () => {
   const [formData, setFormData] = useState({
@@ -57,14 +58,9 @@ const ContactPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-deep-space relative overflow-hidden">
-      {/* Cosmic Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-comet-cyan/10 rounded-full blur-3xl animate-cosmic-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-48 h-48 bg-plasma-purple/10 rounded-full blur-2xl animate-stellar-drift"></div>
-        <div className="absolute top-1/2 left-3/4 w-32 h-32 bg-aurora-green/10 rounded-full blur-xl animate-nebula-swirl"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-40 h-40 bg-nebula-pink/8 rounded-full blur-2xl animate-space-float"></div>
-      </div>
+    <div className="min-h-screen bg-slate-900 relative overflow-hidden">
+      {/* Falling Stars Background */}
+      <FallingStars density="light" />
       {/* Header */}
       <div className="relative overflow-hidden bg-gradient-to-r from-comet-cyan via-plasma-purple to-aurora-green">
         <div className="absolute inset-0 bg-black/20"></div>

@@ -13,5 +13,5 @@ INSERT IGNORE INTO categories (name, description, icon, color) VALUES
 ('Food & Culinary', 'Food festivals, cooking classes, and culinary events', 'fas fa-utensils', '#fd7e14');
 
 -- Insert default admin user (password: admin123)
-INSERT IGNORE INTO users (username, email, password, full_name, role) VALUES
-('admin', 'admin@eventapp.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Administrator', 'admin');
+INSERT IGNORE INTO users (username, email, password, full_name, role, is_active) VALUES
+('admin', 'abdul.mughni845@gmail.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Abdul Mughni', 'admin', TRUE);

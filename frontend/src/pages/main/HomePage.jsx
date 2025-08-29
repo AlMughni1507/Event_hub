@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { eventsAPI, categoriesAPI } from '../../services/api';
+import FallingStars from '../../components/FallingStars';
 
 const HomePage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -162,6 +163,8 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-space relative overflow-hidden">
+      {/* Falling Stars Background */}
+      <FallingStars density="heavy" />
       {/* Navigation */}
       <nav className="bg-deep-space/30 backdrop-blur-md border-b border-cyan-400/20 sticky top-0 z-50 relative overflow-hidden">
         {/* Enhanced Space Background Elements for Navigation */}

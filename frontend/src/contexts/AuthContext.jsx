@@ -46,6 +46,10 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Clear any cached data
+    localStorage.clear();
+    // Force reload to clear any stale state
+    window.location.href = '/login';
   };
 
   const isAuthenticated = !!user;

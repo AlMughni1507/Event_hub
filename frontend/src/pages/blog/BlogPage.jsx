@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import FallingStars from '../../components/FallingStars';
 
 const BlogPage = () => {
   const [articles, setArticles] = useState([]);
@@ -93,6 +94,8 @@ const BlogPage = () => {
 
   return (
     <div className="min-h-screen bg-deep-space relative overflow-hidden">
+      {/* Falling Stars Background */}
+      <FallingStars density="light" />
       {/* Cosmic Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-comet-cyan/10 rounded-full blur-3xl animate-cosmic-pulse"></div>

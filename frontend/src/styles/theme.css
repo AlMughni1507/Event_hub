@@ -407,6 +407,86 @@ body {
   animation: void-pulse 8s ease-in-out infinite;
 }
 
+/* Falling Star Animation Classes */
+.animate-falling-star-1 {
+  animation: falling-star-1 8s linear infinite;
+  animation-delay: 0s;
+}
+
+.animate-falling-star-2 {
+  animation: falling-star-2 10s linear infinite;
+  animation-delay: 2s;
+}
+
+.animate-falling-star-3 {
+  animation: falling-star-3 7s linear infinite;
+  animation-delay: 4s;
+}
+
+.animate-falling-star-fast {
+  animation: falling-star-fast 5s linear infinite;
+  animation-delay: 1s;
+}
+
+.animate-falling-star-slow {
+  animation: falling-star-slow 12s linear infinite;
+  animation-delay: 3s;
+}
+
+.animate-meteor-shower {
+  animation: meteor-shower 9s linear infinite;
+  animation-delay: 5s;
+}
+
+/* Falling Star Background Elements */
+.falling-stars-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.falling-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+
+.falling-star-small {
+  width: 1px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.falling-star-medium {
+  width: 3px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.falling-star-large {
+  width: 4px;
+  height: 4px;
+  background: white;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 0 24px rgba(0, 212, 255, 0.4);
+}
+
+.falling-star-comet {
+  width: 6px;
+  height: 6px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(0, 212, 255, 0.8) 50%, transparent 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.9), 0 0 40px rgba(0, 212, 255, 0.6);
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -474,6 +554,134 @@ body {
   100% {
     transform: translateX(100vw) translateY(-100vh) rotate(-45deg);
     opacity: 0;
+  }
+}
+
+@keyframes falling-star-1 {
+  0% {
+    transform: translateX(-50px) translateY(-50px) rotate(-30deg);
+    opacity: 0;
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+  15% {
+    opacity: 1;
+    box-shadow: -10px 10px 20px rgba(255, 255, 255, 0.8), -20px 20px 40px rgba(0, 212, 255, 0.6);
+  }
+  85% {
+    opacity: 1;
+    box-shadow: -30px 30px 60px rgba(255, 255, 255, 0.4), -40px 40px 80px rgba(0, 212, 255, 0.3);
+  }
+  100% {
+    transform: translateX(120vw) translateY(120vh) rotate(-30deg);
+    opacity: 0;
+    box-shadow: -50px 50px 100px rgba(255, 255, 255, 0);
+  }
+}
+
+@keyframes falling-star-2 {
+  0% {
+    transform: translateX(20vw) translateY(-50px) rotate(-60deg);
+    opacity: 0;
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+  }
+  20% {
+    opacity: 1;
+    box-shadow: -15px 15px 30px rgba(255, 215, 0, 0.9), -25px 25px 50px rgba(255, 140, 0, 0.7);
+  }
+  80% {
+    opacity: 1;
+    box-shadow: -35px 35px 70px rgba(255, 215, 0, 0.5), -45px 45px 90px rgba(255, 140, 0, 0.4);
+  }
+  100% {
+    transform: translateX(140vw) translateY(140vh) rotate(-60deg);
+    opacity: 0;
+    box-shadow: -60px 60px 120px rgba(255, 215, 0, 0);
+  }
+}
+
+@keyframes falling-star-3 {
+  0% {
+    transform: translateX(70vw) translateY(-30px) rotate(-45deg);
+    opacity: 0;
+    box-shadow: 0 0 0 rgba(139, 92, 246, 0);
+  }
+  12% {
+    opacity: 1;
+    box-shadow: -12px 12px 24px rgba(139, 92, 246, 0.8), -22px 22px 44px rgba(255, 0, 110, 0.6);
+  }
+  88% {
+    opacity: 1;
+    box-shadow: -32px 32px 64px rgba(139, 92, 246, 0.4), -42px 42px 84px rgba(255, 0, 110, 0.3);
+  }
+  100% {
+    transform: translateX(150vw) translateY(130vh) rotate(-45deg);
+    opacity: 0;
+    box-shadow: -55px 55px 110px rgba(139, 92, 246, 0);
+  }
+}
+
+@keyframes falling-star-fast {
+  0% {
+    transform: translateX(-30px) translateY(-30px) rotate(-35deg);
+    opacity: 0;
+    box-shadow: 0 0 0 rgba(0, 255, 136, 0);
+  }
+  25% {
+    opacity: 1;
+    box-shadow: -8px 8px 16px rgba(0, 255, 136, 0.9), -16px 16px 32px rgba(0, 212, 255, 0.7);
+  }
+  75% {
+    opacity: 1;
+    box-shadow: -24px 24px 48px rgba(0, 255, 136, 0.5), -32px 32px 64px rgba(0, 212, 255, 0.4);
+  }
+  100% {
+    transform: translateX(110vw) translateY(110vh) rotate(-35deg);
+    opacity: 0;
+    box-shadow: -40px 40px 80px rgba(0, 255, 136, 0);
+  }
+}
+
+@keyframes falling-star-slow {
+  0% {
+    transform: translateX(40vw) translateY(-40px) rotate(-50deg);
+    opacity: 0;
+    box-shadow: 0 0 0 rgba(255, 133, 0, 0);
+  }
+  18% {
+    opacity: 1;
+    box-shadow: -18px 18px 36px rgba(255, 133, 0, 0.8), -28px 28px 56px rgba(255, 0, 110, 0.6);
+  }
+  82% {
+    opacity: 1;
+    box-shadow: -38px 38px 76px rgba(255, 133, 0, 0.4), -48px 48px 96px rgba(255, 0, 110, 0.3);
+  }
+  100% {
+    transform: translateX(160vw) translateY(150vh) rotate(-50deg);
+    opacity: 0;
+    box-shadow: -65px 65px 130px rgba(255, 133, 0, 0);
+  }
+}
+
+@keyframes meteor-shower {
+  0% {
+    transform: translateX(-80px) translateY(-80px) rotate(-40deg) scale(0.5);
+    opacity: 0;
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(-60px) translateY(-60px) rotate(-40deg) scale(0.8);
+    box-shadow: -20px 20px 40px rgba(255, 255, 255, 0.9), -30px 30px 60px rgba(0, 212, 255, 0.7);
+  }
+  90% {
+    opacity: 1;
+    transform: translateX(120vw) translateY(120vh) rotate(-40deg) scale(1.2);
+    box-shadow: -50px 50px 100px rgba(255, 255, 255, 0.4), -60px 60px 120px rgba(0, 212, 255, 0.3);
+  }
+  100% {
+    transform: translateX(140vw) translateY(140vh) rotate(-40deg) scale(1.5);
+    opacity: 0;
+    box-shadow: -70px 70px 140px rgba(255, 255, 255, 0);
   }
 }
 
