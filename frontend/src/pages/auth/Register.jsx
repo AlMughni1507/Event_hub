@@ -5,7 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import FallingStars from '../../components/FallingStars';
 
 const RegisterPage = () => {
-  const [step, setStep] = useState('register');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -14,7 +13,6 @@ const RegisterPage = () => {
     full_name: '',
     phone: ''
   });
-  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
@@ -58,8 +56,19 @@ const RegisterPage = () => {
       });
       
       if (response && response.success) {
-        setMessage('Registrasi berhasil! Kode OTP telah dikirim ke email Anda.');
-        setStep('verify');
+        // Auto-login after successful registration
+        if (response.data.user && response.data.token) {
+          login(response.data.user, response.data.token);
+          setMessage('Registrasi berhasil! Selamat datang di EventHub!');
+          setTimeout(() => {
+            navigate('/');
+          }, 2000);
+        } else {
+          setMessage('Registrasi berhasil! Anda dapat login sekarang.');
+          setTimeout(() => {
+            navigate('/login');
+          }, 2000);
+        }
       } else {
         setMessage(response?.message || 'Registrasi gagal');
       }
@@ -71,165 +80,6 @@ const RegisterPage = () => {
     }
   };
 
-  const handleResendOTP = async () => {
-    setLoading(true);
-    setMessage('');
-
-    try {
-      const response = await fetch('http://localhost:3000/api/auth/request-email-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: formData.email }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage('OTP baru telah dikirim ke email Anda');
-      } else {
-        setMessage(data.message || 'Gagal mengirim OTP');
-      }
-    } catch (error) {
-      console.error('Resend OTP error:', error);
-      setMessage('Terjadi kesalahan saat mengirim OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    
-    if (!otp) {
-      setMessage('Masukkan kode OTP');
-      return;
-    }
-
-    setLoading(true);
-    setMessage('');
-
-    try {
-      const response = await fetch('http://localhost:3000/api/auth/verify-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          email: formData.email, 
-          otp: otp 
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        if (data.user && data.token) {
-          login(data.user, data.token);
-          setMessage('Verifikasi berhasil! Selamat datang!');
-          setTimeout(() => {
-            navigate('/');
-          }, 2000);
-        } else {
-          setMessage('Verifikasi berhasil! Anda dapat login sekarang.');
-          setTimeout(() => {
-            navigate('/login');
-          }, 2000);
-        }
-      } else {
-        setMessage(data.message || 'Verifikasi gagal');
-      }
-    } catch (error) {
-      console.error('Verify OTP error:', error);
-      setMessage('Terjadi kesalahan saat verifikasi');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (step === 'verify') {
-    return (
-      <div className="min-h-screen bg-slate-900 relative overflow-hidden flex">
-        <FallingStars density="light" />
-        
-        {/* Left Panel */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
-          <div className="relative z-10 flex flex-col justify-center px-12 text-white">
-            <button
-              onClick={() => navigate('/')}
-              className="absolute top-8 left-8 flex items-center text-white/80 hover:text-white transition-colors group">
-              <svg className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Kembali ke Beranda
-            </button>
-            <div className="mb-8">
-              <h1 className="text-4xl font-bold mb-4 text-white">Verifikasi Email</h1>
-              <p className="text-xl text-slate-300">Langkah terakhir untuk mengaktifkan akun Anda</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Panel - Verification Form */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-          <div className="w-full max-w-md">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Verifikasi Email</h2>
-              <p className="text-slate-400">Masukkan kode OTP yang dikirim ke email Anda</p>
-            </div>
-            {message && (
-              <div className={`p-4 rounded-lg mb-6 ${
-                message.includes('berhasil') 
-                  ? 'bg-green-900/50 text-green-300 border border-green-700' 
-                  : 'bg-red-900/50 text-red-300 border border-red-700'
-              }`}>
-                {message}
-              </div>
-            )}
-            <form className="space-y-6" onSubmit={handleVerifyOTP}>
-              <div>
-                <label htmlFor="otp" className="block text-sm font-medium text-slate-300 mb-2">Kode OTP</label>
-                <input
-                  id="otp"
-                  name="otp"
-                  type="text"
-                  required
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  className="w-full px-3 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Masukkan 6 digit kode OTP"
-                  maxLength="6"
-                />
-              </div>
-              <div className="space-y-4">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
-                  {loading ? 'Memverifikasi...' : 'Verifikasi Email'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResendOTP}
-                  disabled={loading}
-                  className="w-full text-sm text-blue-400 hover:text-blue-300 disabled:opacity-50 py-2 transition-colors">
-                  Kirim ulang kode OTP
-                </button>
-              </div>
-            </form>
-            <div className="text-center mt-6">
-              <button
-                onClick={() => setStep('register')}
-                className="text-sm text-slate-400 hover:text-white transition-colors">
-                ← Kembali ke pendaftaran
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-900 relative overflow-hidden flex">

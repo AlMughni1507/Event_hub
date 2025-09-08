@@ -26,10 +26,14 @@ const EventsManagement = () => {
     address: '',
     city: '',
     province: '',
+    postal_code: '',
     max_participants: '',
     price: '',
     is_free: false,
-    status: 'draft'
+    is_featured: false,
+    is_active: true,
+    status: 'draft',
+    registration_deadline: ''
   });
 
   useEffect(() => {
@@ -104,10 +108,14 @@ const EventsManagement = () => {
       address: event.address || '',
       city: event.city || '',
       province: event.province || '',
+      postal_code: event.postal_code || '',
       max_participants: event.max_participants || '',
       price: event.price || '',
       is_free: event.is_free || false,
-      status: event.status || 'draft'
+      is_featured: event.is_featured || false,
+      is_active: event.is_active !== undefined ? event.is_active : true,
+      status: event.status || 'draft',
+      registration_deadline: event.registration_deadline || ''
     });
     setShowModal(true);
   };
@@ -195,10 +203,14 @@ const EventsManagement = () => {
       address: '',
       city: '',
       province: '',
+      postal_code: '',
       max_participants: '',
       price: '',
       is_free: false,
-      status: 'draft'
+      is_featured: false,
+      is_active: true,
+      status: 'draft',
+      registration_deadline: ''
     });
   };
 

@@ -24,52 +24,33 @@ const LoginPage = () => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
-      // Try admin login first if email contains admin keywords
-      let response;
-      let isAdminLogin = false;
-      
       console.log('🔍 Login attempt for email:', email);
       
-      if (email.includes('admin') || email.includes('abdul.mughni845@gmail.com')) {
+      let response;
+      
+      // Check if this is an admin email and use appropriate endpoint
+      if (email === 'abdul.mughni845@gmail.com' || email.includes('admin')) {
         console.log('🔍 Attempting admin login...');
-        try {
-          response = await authAPI.adminLogin({ email, password });
-          console.log('✅ Admin login successful:', response);
-          isAdminLogin = true;
-          setSuccess('Admin login successful! Redirecting to dashboard...');
-        } catch (adminError) {
-          console.log('❌ Admin login failed:', adminError);
-          console.log('🔄 Trying regular login...');
-          response = await authAPI.login({ email, password });
-        }
+        response = await authAPI.adminLogin({ email, password });
       } else {
-        console.log('🔍 Attempting regular login...');
+        console.log('🔍 Attempting regular user login...');
         response = await authAPI.login({ email, password });
       }
       
       console.log('🔍 Login response:', response);
       
       // Check if response has the expected structure
-      if (!response) {
+      if (!response || !response.data) {
         throw new Error('Invalid response from server');
       }
       
-      // Handle different response structures
-      let user, token;
+      const { user, token } = response.data;
       
-      if (response.data) {
-        // If response has data property
-        user = response.data.user;
-        token = response.data.token;
-      } else if (response.user && response.token) {
-        // If response is direct
-        user = response.user;
-        token = response.token;
-      } else {
-        throw new Error('Invalid response structure from server');
+      if (!user || !token) {
+        throw new Error('Invalid response from server - missing user or token');
       }
       
-      if (!user || !user.role) {
+      if (!user.role) {
         throw new Error('User data is incomplete');
       }
       
@@ -79,15 +60,19 @@ const LoginPage = () => {
       
       if (user.role === 'admin') {
         console.log('✅ Redirecting to admin dashboard...');
+        setSuccess('Admin login successful! Redirecting to dashboard...');
         setTimeout(() => {
           navigate('/admin/dashboard');
         }, 1000);
       } else {
         console.log('✅ Redirecting to home page...');
-        navigate('/');
+        setSuccess('Login successful! Welcome back!');
+        setTimeout(() => {
+          navigate('/');
+        }, 1000);
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       setError(error.message || 'Invalid email or password');
     } finally {
       setLoading(false);
@@ -151,6 +136,9 @@ const LoginPage = () => {
               <div className="mt-4 p-3 bg-blue-900/20 border border-blue-600/30 rounded-lg">
                 <p className="text-blue-300 text-sm">
                   <strong>Admin Access:</strong> Use admin credentials to access dashboard
+                </p>
+                <p className="text-blue-300 text-xs mt-1">
+                  Email: abdul.mughni845@gmail.com | Password: admin123
                 </p>
               </div>
             </div>

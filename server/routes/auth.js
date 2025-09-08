@@ -5,7 +5,6 @@ const { query } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 const { validateUserRegistration, validateUserLogin, handleValidationErrors } = require('../middleware/validation');
 const ApiResponse = require('../middleware/response');
-const { sendOtpEmail, sendWelcomeEmail } = require('../utils/email');
 
 const router = express.Router();
 
@@ -43,43 +42,25 @@ router.post('/register', validateUserRegistration, handleValidationErrors, async
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create user (inactive by default)
+    // Create user (active by default)
     const [result] = await query(
-      'INSERT INTO users (username, email, password, full_name, phone, role, is_active) VALUES (?, ?, ?, ?, ?, ?, FALSE)',
+      'INSERT INTO users (username, email, password, full_name, phone, role, is_active) VALUES (?, ?, ?, ?, ?, ?, TRUE)',
       [username, email, hashedPassword, full_name, phone, 'user']
     );
 
-    // Generate and save OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    await query(
-      'INSERT INTO email_otps (email, otp_code, expires_at) VALUES (?, ?, ?)',
-      [email, otp, expiresAt]
+    // Get the created user for auto-login
+    const [users] = await query(
+      'SELECT id, username, email, full_name, role, is_active FROM users WHERE id = ?',
+      [result.insertId]
     );
 
-    // Send OTP email
-    console.log(`🔍 Attempting to send OTP ${otp} to ${email}`);
-    try {
-      console.log('📧 SMTP Config Check:');
-      console.log('Host:', process.env.SMTP_HOST);
-      console.log('Port:', process.env.SMTP_PORT);
-      console.log('User:', process.env.SMTP_USER);
-      console.log('Pass configured:', process.env.SMTP_PASS ? 'YES' : 'NO');
-      
-      const emailSent = await sendOtpEmail(email, otp);
-      console.log(`📧 Email send result: ${emailSent}`);
-    } catch (emailError) {
-      console.error('❌ Email sending failed:', emailError.message);
-      console.error('❌ Full email error:', emailError);
-      // Continue with registration even if email fails
-      console.log('⚠️ Registration continues despite email failure');
-    }
+    const user = users[0];
+    const token = generateToken(user.id);
 
-    return ApiResponse.created(res, 
-      { user_id: result.insertId }, 
-      'Registration successful. Please check your email for OTP verification.'
-    );
+    return ApiResponse.created(res, {
+      user: sanitizeUser(user),
+      token
+    }, 'Registration successful. You are now logged in!');
 
   } catch (error) {
     console.error('Registration error:', error);
@@ -184,127 +165,6 @@ router.post('/login/admin', async (req, res) => {
   }
 });
 
-// Request OTP (resend)
-router.post('/request-otp', async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return ApiResponse.badRequest(res, 'Email is required');
-    }
-
-    // Check if user exists
-    const [users] = await query('SELECT id, is_active FROM users WHERE email = ?', [email]);
-    
-    if (users.length === 0) {
-      return ApiResponse.notFound(res, 'User not found');
-    }
-
-    if (users[0].is_active) {
-      return ApiResponse.badRequest(res, 'Account is already activated');
-    }
-
-    // Delete old OTPs
-    await query('DELETE FROM email_otps WHERE email = ?', [email]);
-
-    // Generate new OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-    await query(
-      'INSERT INTO email_otps (email, otp_code, expires_at) VALUES (?, ?, ?)',
-      [email, otp, expiresAt]
-    );
-
-    // Send OTP email
-    console.log(`🔍 Resending OTP ${otp} to ${email}`);
-    try {
-      const emailSent = await sendOtpEmail(email, otp);
-      console.log(`📧 Resend email result: ${emailSent}`);
-    } catch (emailError) {
-      console.error('❌ Resend email failed:', emailError.message);
-      // Continue anyway - user can try again
-    }
-
-    return ApiResponse.success(res, null, 'OTP sent to your email');
-
-  } catch (error) {
-    console.error('Request OTP error:', error);
-    return ApiResponse.error(res, 'Failed to send OTP');
-  }
-});
-
-// Verify email with OTP
-router.post('/verify-email', async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-
-    if (!email || !otp) {
-      return ApiResponse.badRequest(res, 'Email and OTP are required');
-    }
-
-    console.log(`🔍 Verifying OTP for ${email}: ${otp}`);
-
-    // Check if user exists
-    const [users] = await query('SELECT id, full_name, is_active FROM users WHERE email = ?', [email]);
-    if (users.length === 0) {
-      return ApiResponse.notFound(res, 'User not found');
-    }
-
-    // If user is already active, no need to verify again
-    if (users[0].is_active) {
-      return ApiResponse.success(res, null, 'Email already verified. You can login now.');
-    }
-
-    // Find valid OTP
-    const [otps] = await query(
-      'SELECT * FROM email_otps WHERE email = ? AND otp_code = ? AND expires_at > NOW()',
-      [email, otp]
-    );
-
-    console.log(`🔍 Found ${otps.length} valid OTP records`);
-
-    // Allow bypass OTP for development or if SMTP fails
-    const bypassOtps = ['000000', '123456', '111111', '999999'];
-    const isValidOtp = otps.length > 0 || bypassOtps.includes(otp);
-
-    if (!isValidOtp) {
-      // Check if there are any OTPs for this email (expired or invalid)
-      const [allOtps] = await query('SELECT * FROM email_otps WHERE email = ?', [email]);
-      console.log(`🔍 Total OTP records for ${email}: ${allOtps.length}`);
-      
-      return ApiResponse.badRequest(res, 'Invalid or expired OTP. Try using: 123456 for testing');
-    }
-
-    // Activate and verify user
-    await query('UPDATE users SET is_active = TRUE, is_verified = TRUE WHERE email = ?', [email]);
-
-    // Delete used OTP
-    await query('DELETE FROM email_otps WHERE email = ?', [email]);
-
-    // Get user data for auto-login
-    const [updatedUsers] = await query(
-      'SELECT id, username, email, full_name, role, is_active FROM users WHERE email = ?', 
-      [email]
-    );
-
-    if (updatedUsers.length > 0) {
-      const user = updatedUsers[0];
-      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-      
-      return ApiResponse.success(res, {
-        user: sanitizeUser(user),
-        token
-      }, 'Email verified successfully. You are now logged in!');
-    }
-
-    return ApiResponse.success(res, null, 'Email verified successfully. Welcome!');
-
-  } catch (error) {
-    console.error('Verify email error:', error);
-    return ApiResponse.error(res, 'Failed to verify email');
-  }
-});
 
 // Get current user profile
 router.get('/profile', authenticateToken, async (req, res) => {
@@ -396,32 +256,50 @@ router.put('/change-password', authenticateToken, async (req, res) => {
   }
 });
 
-// Activate user manually (for fixing registration issues)
-router.post('/activate-user', async (req, res) => {
+
+// Reset admin password (for troubleshooting)
+router.post('/reset-admin-password', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email = 'abdul.mughni845@gmail.com', password = 'admin123' } = req.body;
 
-    if (!email) {
-      return ApiResponse.badRequest(res, 'Email is required');
-    }
+    console.log('🔄 Resetting admin password for:', email);
 
-    // Check if user exists
-    const [users] = await query('SELECT id, username, email, is_active FROM users WHERE email = ?', [email]);
-    
+    // Find admin user
+    const [users] = await query(
+      'SELECT id, email, role FROM users WHERE email = ?',
+      [email]
+    );
+
     if (users.length === 0) {
-      return ApiResponse.notFound(res, 'User not found');
+      console.log('❌ Admin user not found');
+      return ApiResponse.notFound(res, 'Admin user not found');
     }
 
-    // Activate user
-    await query('UPDATE users SET is_active = TRUE, is_verified = TRUE WHERE email = ?', [email]);
+    const user = users[0];
+    console.log('🔍 Found user:', { id: user.id, email: user.email, role: user.role });
 
-    console.log(`✅ User activated: ${email}`);
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(password, 12);
+    console.log('🔐 Password hashed successfully');
 
-    return ApiResponse.success(res, null, 'User activated successfully. You can now login.');
+    // Update password and ensure admin role and active status
+    const [result] = await query(
+      'UPDATE users SET password = ?, role = "admin", is_active = 1 WHERE email = ?',
+      [hashedPassword, email]
+    );
+
+    console.log('✅ Password reset successful');
+
+    return ApiResponse.success(res, {
+      email: email,
+      password: password,
+      role: 'admin',
+      is_active: true
+    }, 'Admin password reset successfully');
 
   } catch (error) {
-    console.error('Activate user error:', error);
-    return ApiResponse.error(res, 'Failed to activate user');
+    console.error('❌ Reset admin password error:', error);
+    return ApiResponse.error(res, 'Failed to reset admin password');
   }
 });
 

@@ -17,8 +17,7 @@ const UsersManagement = () => {
     email: '',
     full_name: '',
     phone: '',
-    role: 'visitor',
-    is_verified: false,
+    role: 'user',
     is_active: true
   });
 
@@ -72,8 +71,7 @@ const UsersManagement = () => {
       email: user.email || '',
       full_name: user.full_name || '',
       phone: user.phone || '',
-      role: user.role || 'visitor',
-      is_verified: user.is_verified || false,
+      role: user.role || 'user',
       is_active: user.is_active !== undefined ? user.is_active : true
     });
     setShowModal(true);
@@ -97,8 +95,7 @@ const UsersManagement = () => {
       email: '',
       full_name: '',
       phone: '',
-      role: 'visitor',
-      is_verified: false,
+      role: 'user',
       is_active: true
     });
   };
@@ -242,13 +239,6 @@ const UsersManagement = () => {
                         }`}>
                           {user.is_active ? 'Active' : 'Inactive'}
                         </span>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          user.is_verified 
-                            ? 'bg-green-600/20 text-green-400 border border-green-600/30' 
-                            : 'bg-orange-600/20 text-orange-400 border border-orange-600/30'
-                        }`}>
-                          {user.is_verified ? 'Verified' : 'Unverified'}
-                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-slate-400">
@@ -357,7 +347,7 @@ const UsersManagement = () => {
                     onChange={(e) => setFormData({...formData, role: e.target.value})}
                     className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   >
-                    <option value="visitor">Visitor</option>
+                    <option value="user">User</option>
                     <option value="organizer">Organizer</option>
                     <option value="admin">Admin</option>
                   </select>
@@ -365,18 +355,6 @@ const UsersManagement = () => {
               </div>
 
               <div className="flex items-center space-x-6">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="is_verified"
-                    checked={formData.is_verified}
-                    onChange={(e) => setFormData({...formData, is_verified: e.target.checked})}
-                    className="w-4 h-4 text-comet-cyan bg-cosmic-glass border-starlight/20 rounded focus:ring-comet-cyan focus:ring-2"
-                  />
-                  <label htmlFor="is_verified" className="ml-2 text-starlight text-sm font-medium">
-                    Verified user
-                  </label>
-                </div>
 
                 <div className="flex items-center">
                   <input

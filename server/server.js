@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-require('dotenv').config({ path: './config.env' });
+require('dotenv').config();
 
 const app = express();
 
@@ -55,6 +55,7 @@ const paymentRoutes = require('./routes/payments');
 
 // Use routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/registrations', registrationRoutes);

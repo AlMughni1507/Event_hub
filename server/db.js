@@ -1,6 +1,6 @@
 // db.js
 const mysql = require('mysql2');
-require('dotenv').config({ path: './config.env' });
+require('dotenv').config();
 
 // Create connection pool for better performance
 const pool = mysql.createPool({

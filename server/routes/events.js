@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
     // Get events with category info and registration count
     const [events] = await query(
       `SELECT e.*, c.name as category_name, 
-              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as approved_registrations
+              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        ${whereClause}
@@ -72,7 +72,7 @@ router.get('/:id', async (req, res) => {
 
     const [events] = await query(
       `SELECT e.*, c.name as category_name,
-              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as approved_registrations
+              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        WHERE e.id = ? AND e.is_active = 1`,
@@ -94,7 +94,7 @@ router.get('/:id', async (req, res) => {
 // Create event (admin only)
 router.post('/', authenticateToken, requireUser, validateEvent, handleValidationErrors, async (req, res) => {
   try {
-    const { title, description, event_date, location, category_id, max_participants, registration_fee, image_url } = req.body;
+    const { title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, max_participants, price, is_free, image_url, banner, status } = req.body;
 
     // Check if category exists
     const [categories] = await query('SELECT id FROM categories WHERE id = ?', [category_id]);
@@ -104,9 +104,9 @@ router.post('/', authenticateToken, requireUser, validateEvent, handleValidation
 
     // Create event
     const [result] = await query(
-      `INSERT INTO events (title, description, event_date, location, category_id, max_participants, registration_fee, image_url, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [title, description, event_date, location, category_id, max_participants, registration_fee, image_url, req.user.id]
+      `INSERT INTO events (title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, organizer_id, max_participants, price, is_free, image, banner, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, req.user.id, max_participants, price || 0, is_free || false, image_url, banner, status || 'draft']
     );
 
     // Get created event
@@ -130,7 +130,7 @@ router.post('/', authenticateToken, requireUser, validateEvent, handleValidation
 router.put('/:id', authenticateToken, requireUser, validateEvent, handleValidationErrors, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, event_date, location, category_id, max_participants, registration_fee, image_url, is_active } = req.body;
+    const { title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, max_participants, price, is_free, image_url, banner, status, is_active } = req.body;
 
     // Check if event exists
     const [existingEvents] = await query('SELECT id FROM events WHERE id = ?', [id]);
@@ -147,10 +147,10 @@ router.put('/:id', authenticateToken, requireUser, validateEvent, handleValidati
     // Update event
     await query(
       `UPDATE events 
-       SET title = ?, description = ?, event_date = ?, location = ?, category_id = ?, 
-           max_participants = ?, registration_fee = ?, image_url = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP 
+       SET title = ?, description = ?, short_description = ?, event_date = ?, event_time = ?, end_date = ?, end_time = ?, location = ?, address = ?, city = ?, province = ?, category_id = ?, 
+           max_participants = ?, price = ?, is_free = ?, image = ?, banner = ?, status = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP 
        WHERE id = ?`,
-      [title, description, event_date, location, category_id, max_participants, registration_fee, image_url, is_active, id]
+      [title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, max_participants, price || 0, is_free || false, image_url, banner, status, is_active, id]
     );
 
     // Get updated event
@@ -182,7 +182,7 @@ router.delete('/:id', authenticateToken, requireUser, async (req, res) => {
     }
 
     // Check if there are registrations
-    const [registrations] = await query('SELECT id FROM event_registrations WHERE event_id = ?', [id]);
+    const [registrations] = await query('SELECT id FROM registrations WHERE event_id = ?', [id]);
     if (registrations.length > 0) {
       return ApiResponse.conflict(res, 'Cannot delete event with existing registrations');
     }
@@ -205,7 +205,7 @@ router.get('/upcoming/events', async (req, res) => {
 
     const [events] = await query(
       `SELECT e.*, c.name as category_name,
-              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as approved_registrations
+              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        WHERE e.is_active = 1 AND e.event_date > NOW()
@@ -244,7 +244,7 @@ router.get('/category/:categoryId', async (req, res) => {
     // Get events
     const [events] = await query(
       `SELECT e.*, c.name as category_name,
-              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as approved_registrations
+              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        WHERE e.category_id = ? AND e.is_active = 1
@@ -293,7 +293,7 @@ router.get('/search/events', async (req, res) => {
     // Get events
     const [events] = await query(
       `SELECT e.*, c.name as category_name,
-              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as approved_registrations
+              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        WHERE e.is_active = 1 AND 

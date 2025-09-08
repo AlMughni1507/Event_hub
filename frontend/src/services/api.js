@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 // Create axios instance
 const api = axios.create({
@@ -47,7 +47,6 @@ export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   adminLogin: (credentials) => api.post('/auth/login/admin', credentials),
   register: (userData) => api.post('/auth/register', userData),
-  logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data) => api.put('/auth/profile', data),
 };
