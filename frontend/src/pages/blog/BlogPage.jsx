@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import FallingStars from '../../components/FallingStars';
+import { BookOpen, Lightbulb, Newspaper, Calendar, FileText, Search } from 'lucide-react';
+import Footer from '../../components/Footer';
 
 const BlogPage = () => {
   const [articles, setArticles] = useState([]);
@@ -10,14 +11,24 @@ const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
 
+  // Handle navbar scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const categories = [
-    { value: 'all', label: 'Semua Artikel', icon: '📚' },
-    { value: 'tips', label: 'Tips & Trik', icon: '💡' },
-    { value: 'news', label: 'Berita', icon: '📰' },
-    { value: 'event-update', label: 'Update Event', icon: '🎪' },
-    { value: 'general', label: 'Umum', icon: '📝' }
+    { value: 'all', label: 'Semua Artikel', icon: BookOpen },
+    { value: 'tips', label: 'Tips & Trik', icon: Lightbulb },
+    { value: 'news', label: 'Berita', icon: Newspaper },
+    { value: 'event-update', label: 'Update Event', icon: Calendar },
+    { value: 'general', label: 'Umum', icon: FileText }
   ];
 
   useEffect(() => {
@@ -84,7 +95,8 @@ const BlogPage = () => {
 
   const getCategoryIcon = (category) => {
     const categoryData = categories.find(cat => cat.value === category);
-    return categoryData ? categoryData.icon : '📝';
+    const IconComponent = categoryData ? categoryData.icon : FileText;
+    return <IconComponent className="w-5 h-5" />;
   };
 
   const getCategoryLabel = (category) => {
@@ -93,63 +105,135 @@ const BlogPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-deep-space relative overflow-hidden">
-      {/* Falling Stars Background */}
-      <FallingStars density="light" />
-      {/* Cosmic Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-comet-cyan/10 rounded-full blur-3xl animate-cosmic-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-48 h-48 bg-plasma-purple/10 rounded-full blur-2xl animate-stellar-drift"></div>
-        <div className="absolute top-1/2 left-3/4 w-32 h-32 bg-aurora-green/10 rounded-full blur-xl animate-nebula-swirl"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-40 h-40 bg-nebula-pink/8 rounded-full blur-2xl animate-space-float"></div>
-      </div>
-      {/* Header */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-comet-cyan via-plasma-purple to-aurora-green">
+    <div className="min-h-screen bg-gray-50">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;600;700;900&display=swap');
+        .font-bebas { font-family: 'Bebas Neue', cursive; }
+        .font-poppins { font-family: 'Poppins', sans-serif; }
+      `}</style>
+
+      {/* Custom Transparent Navbar */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled 
+          ? 'bg-black/90 backdrop-blur-md shadow-lg' 
+          : 'bg-transparent'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-20">
+            {/* Logo */}
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+              <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-white" />
+              </div>
+              <span className="font-bebas text-2xl text-white tracking-wider">EVENTHUB</span>
+            </div>
+
+            {/* Desktop Menu */}
+            <div className="hidden md:flex items-center gap-8">
+              <button onClick={() => navigate('/')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Home</button>
+              <button onClick={() => navigate('/events')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Events</button>
+              <button onClick={() => navigate('/blog')} className="font-poppins text-pink-400 font-semibold">Blog</button>
+              <button onClick={() => navigate('/contact')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Contact</button>
+              <button onClick={() => navigate('/about')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">About</button>
+            </div>
+
+            {/* CTA Button */}
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => navigate('/login')}
+                className="hidden md:block font-poppins px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
+              >
+                Get Started
+              </button>
+              
+              {/* Mobile Menu Button */}
+              <button className="md:hidden text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Header */}
+      <div className="relative bg-gradient-to-r from-purple-900 via-purple-800 to-pink-900 pt-24 pb-16">
         <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 z-10">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center text-star-white/80 hover:text-starlight transition-colors group mb-8 animate-fade-in-up"
-          >
-            <svg className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Kembali ke Beranda
-          </button>
-          
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-starlight mb-6 animate-fade-in-up">
-              Blog & Berita
-            </h1>
-            <p className="text-xl text-star-white/90 max-w-3xl mx-auto animate-slide-in-left">
-              Tips, trik, dan update terbaru seputar dunia event dan pengembangan karir
-            </p>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="font-bebas text-5xl md:text-7xl text-white mb-4 tracking-wider">BLOG & ARTICLES</h1>
+          <p className="font-poppins text-xl text-purple-200 max-w-2xl mx-auto">Tips, tricks, and latest updates about events and career development</p>
+        </div>
+      </div>
+
+      {/* Search & Filter Section */}
+      <div className="bg-white shadow-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search articles..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl font-poppins focus:outline-none focus:border-purple-500 transition-colors"
+              />
+            </form>
+            
+            {/* Category Filter */}
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {categories.map((cat) => {
+                const Icon = cat.icon;
+                return (
+                  <button
+                    key={cat.value}
+                    onClick={() => {
+                      setSelectedCategory(cat.value);
+                      setCurrentPage(1);
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-poppins font-semibold text-sm whitespace-nowrap transition-all ${
+                      selectedCategory === cat.value
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Featured Articles */}
         {featuredArticles.length > 0 && (
           <div className="mb-16">
-            <h2 className="text-3xl font-bold text-cosmic mb-8 animate-fade-in-up">Artikel Unggulan</h2>
+            <h2 className="font-poppins text-3xl font-bold text-gray-800 mb-8 flex items-center gap-3">
+              <BookOpen className="w-8 h-8 text-purple-600" />
+              Featured Articles
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredArticles.slice(0, 3).map((article) => (
                 <Link
                   key={article.id}
                   to={`/blog/${article.slug}`}
-                  className="group cosmic-glass rounded-2xl overflow-hidden hover:border-comet-cyan/50 transition-all duration-300 hover:scale-105 animate-fade-in-up"
+                  className="group bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer"
                 >
-                  <div className="aspect-video bg-gradient-to-r from-comet-cyan to-plasma-purple relative overflow-hidden">
+                  <div className="relative h-56 overflow-hidden">
                     {article.featured_image ? (
                       <img 
                         src={article.featured_image} 
                         alt={article.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-6xl">{getCategoryIcon(article.category)}</span>
+                      <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                        {getCategoryIcon(article.category)}
                       </div>
                     )}
                     <div className="absolute top-4 left-4">
@@ -158,19 +242,19 @@ const BlogPage = () => {
                       </span>
                     </div>
                     <div className="absolute top-4 right-4">
-                      <span className="bg-cosmic-gold/20 backdrop-blur-sm text-cosmic-gold text-xs px-2 py-1 rounded-full animate-cosmic-twinkle">
+                      <span className="bg-gray-900/20 backdrop-blur-sm text-gray-900 text-xs px-2 py-1 rounded-full animate-pulse">
                         ⭐ Featured
                       </span>
                     </div>
                   </div>
                   <div className="p-6">
-                    <h3 className="text-xl font-bold text-white mb-3 group-hover:text-indigo-400 transition-colors line-clamp-2">
+                    <h3 className="font-poppins text-xl font-bold text-gray-800 mb-3 line-clamp-2 group-hover:text-purple-600 transition-colors">
                       {article.title}
                     </h3>
-                    <p className="text-gray-300 mb-4 line-clamp-3">
+                    <p className="font-poppins text-gray-600 text-sm mb-4 line-clamp-3">
                       {article.excerpt}
                     </p>
-                    <div className="flex items-center justify-between text-sm text-gray-400">
+                    <div className="flex items-center justify-between text-sm text-gray-500 font-poppins">
                       <span>{article.author_name}</span>
                       <span>{formatDate(article.published_at)}</span>
                     </div>
@@ -181,61 +265,24 @@ const BlogPage = () => {
           </div>
         )}
 
-        {/* Search and Filter */}
+        {/* All Articles Section */}
         <div className="mb-8">
-          <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
-            {/* Search */}
-            <form onSubmit={handleSearch} className="flex-1 max-w-md">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari artikel..."
-                  className="w-full px-4 py-3 pl-12 cosmic-glass border border-starlight/20 rounded-xl text-star-white placeholder-moon-silver focus:outline-none focus:ring-2 focus:ring-comet-cyan focus:border-comet-cyan transition-all animate-glow"
-                />
-                <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-moon-silver animate-cosmic-twinkle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-            </form>
-
-            {/* Category Filter */}
-            <div className="flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <button
-                  key={category.value}
-                  onClick={() => {
-                    setSelectedCategory(category.value);
-                    setCurrentPage(1);
-                  }}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 animate-glow ${
-                    selectedCategory === category.value
-                      ? 'bg-gradient-to-r from-comet-cyan to-plasma-purple text-star-white'
-                      : 'cosmic-glass text-moon-silver hover:bg-cosmic-navy/50'
-                  }`}
-                >
-                  <span className="mr-2">{category.icon}</span>
-                  {category.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <h2 className="font-poppins text-3xl font-bold text-gray-800 mb-8">All Articles</h2>
         </div>
 
         {/* Articles Grid */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[...Array(6)].map((_, index) => (
-              <div key={index} className="cosmic-glass rounded-2xl overflow-hidden animate-pulse">
-                <div className="aspect-video bg-cosmic-navy/50 animate-cosmic-pulse"></div>
+              <div key={index} className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl overflow-hidden animate-pulse">
+                <div className="aspect-video bg-gray-200"></div>
                 <div className="p-6">
-                  <div className="h-6 bg-cosmic-navy/50 rounded mb-3 animate-stellar-drift"></div>
-                  <div className="h-4 bg-cosmic-navy/50 rounded mb-2 animate-nebula-swirl"></div>
-                  <div className="h-4 bg-cosmic-navy/50 rounded mb-4 w-3/4 animate-space-float"></div>
+                  <div className="h-6 bg-gray-200 rounded mb-3"></div>
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded mb-4 w-3/4"></div>
                   <div className="flex justify-between">
-                    <div className="h-4 bg-cosmic-navy/50 rounded w-20 animate-cosmic-pulse"></div>
-                    <div className="h-4 bg-cosmic-navy/50 rounded w-24 animate-stellar-drift"></div>
+                    <div className="h-4 bg-gray-200 rounded w-20"></div>
+                    <div className="h-4 bg-gray-200 rounded w-24"></div>
                   </div>
                 </div>
               </div>
@@ -248,18 +295,18 @@ const BlogPage = () => {
                 <Link
                   key={article.id}
                   to={`/blog/${article.slug}`}
-                  className="group cosmic-glass rounded-2xl overflow-hidden hover:border-comet-cyan/50 transition-all duration-300 hover:scale-105 animate-fade-in-up"
+                  className="group bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer"
                 >
-                  <div className="aspect-video bg-gradient-to-r from-cosmic-navy to-stellar-blue relative overflow-hidden">
+                  <div className="relative h-56 overflow-hidden">
                     {article.featured_image ? (
                       <img 
                         src={article.featured_image} 
                         alt={article.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-6xl">{getCategoryIcon(article.category)}</span>
+                      <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                        {getCategoryIcon(article.category)}
                       </div>
                     )}
                     <div className="absolute top-4 left-4">
@@ -268,26 +315,26 @@ const BlogPage = () => {
                       </span>
                     </div>
                     <div className="absolute bottom-4 right-4">
-                      <span className="cosmic-glass text-star-white text-xs px-2 py-1 rounded-full animate-cosmic-twinkle">
+                      <span className="bg-white/80 backdrop-blur-sm text-gray-900 text-xs px-2 py-1 rounded-full">
                         👁️ {article.views}
                       </span>
                     </div>
                   </div>
                   <div className="p-6">
-                    <h3 className="text-xl font-bold text-white mb-3 group-hover:text-indigo-400 transition-colors line-clamp-2">
+                    <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-gray-700 transition-colors line-clamp-2">
                       {article.title}
                     </h3>
-                    <p className="text-gray-300 mb-4 line-clamp-3">
+                    <p className="text-gray-600 mb-4 line-clamp-3">
                       {article.excerpt}
                     </p>
-                    <div className="flex items-center justify-between text-sm text-gray-400">
+                    <div className="flex items-center justify-between text-sm text-gray-500">
                       <span>{article.author_name}</span>
                       <span>{formatDate(article.published_at)}</span>
                     </div>
                     {article.tags && article.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-3">
                         {article.tags.slice(0, 3).map((tag, index) => (
-                          <span key={index} className="text-xs cosmic-glass text-comet-cyan px-2 py-1 rounded-full animate-glow">
+                          <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
                             #{tag}
                           </span>
                         ))}
@@ -304,7 +351,7 @@ const BlogPage = () => {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 bg-slate-700/50 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-600/50 transition-colors"
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition-colors"
                 >
                   ← Sebelumnya
                 </button>
@@ -316,10 +363,10 @@ const BlogPage = () => {
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
-                        className={`px-4 py-2 rounded-xl transition-all animate-glow ${
+                        className={`px-4 py-2 rounded-xl transition-all ${
                           currentPage === page
-                            ? 'bg-gradient-to-r from-comet-cyan to-plasma-purple text-star-white'
-                            : 'cosmic-glass text-moon-silver hover:bg-cosmic-navy/50'
+                            ? 'bg-gray-900 text-white'
+                            : 'bg-white/80 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-100'
                         }`}
                       >
                         {page}
@@ -331,7 +378,7 @@ const BlogPage = () => {
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className="px-4 py-2 cosmic-glass text-star-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-cosmic-navy/50 transition-all animate-glow"
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition-all"
                 >
                   Selanjutnya →
                 </button>
@@ -340,9 +387,11 @@ const BlogPage = () => {
           </>
         ) : (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">📝</div>
-            <h3 className="text-2xl font-bold text-starlight mb-2 animate-cosmic-twinkle">Tidak Ada Artikel</h3>
-            <p className="text-moon-silver animate-fade-in-up">
+            <div className="flex justify-center mb-4">
+              <FileText className="w-16 h-16 text-gray-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Tidak Ada Artikel</h3>
+            <p className="text-gray-600">
               {searchQuery || selectedCategory !== 'all' 
                 ? 'Tidak ditemukan artikel yang sesuai dengan pencarian atau filter Anda.'
                 : 'Belum ada artikel yang dipublikasikan.'}
@@ -354,7 +403,7 @@ const BlogPage = () => {
                   setSelectedCategory('all');
                   setCurrentPage(1);
                 }}
-                className="mt-4 px-6 py-3 bg-gradient-to-r from-comet-cyan to-plasma-purple text-star-white rounded-xl hover:from-comet-cyan/80 hover:to-plasma-purple/80 transition-all transform hover:scale-105 animate-glow"
+                className="mt-4 px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all transform hover:scale-105"
               >
                 Reset Filter
               </button>
@@ -362,6 +411,9 @@ const BlogPage = () => {
           </div>
         )}
       </div>
+      
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

@@ -121,8 +121,8 @@ const UsersManagement = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">👥 Users Management</h1>
-          <p className="text-slate-400">Manage community members</p>
+          <h1 className="text-3xl font-bold text-black mb-2">👥 Users Management</h1>
+          <p className="text-gray-600">Manage community members</p>
         </div>
         <button
           onClick={() => {
@@ -130,31 +130,31 @@ const UsersManagement = () => {
             resetForm();
             setShowModal(true);
           }}
-          className="mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+          className="mt-4 md:mt-0 bg-black hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-xl transition-colors"
         >
           ✨ Add New User
         </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-white text-sm font-medium mb-2">🔍 Search Users</label>
+            <label className="block text-black text-sm font-medium mb-2">🔍 Search Users</label>
             <input
               type="text"
               value={filters.search}
               onChange={(e) => setFilters({...filters, search: e.target.value})}
               placeholder="Search by name, email, or username..."
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:ring-2 focus:ring-black focus:border-black transition-colors"
             />
           </div>
           <div>
-            <label className="block text-white text-sm font-medium mb-2">👤 Role</label>
+            <label className="block text-black text-sm font-medium mb-2">👤 Role</label>
             <select
               value={filters.role}
               onChange={(e) => setFilters({...filters, role: e.target.value})}
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-black focus:ring-2 focus:ring-black focus:border-black transition-colors"
             >
               <option value="">All Roles</option>
               <option value="admin">Admin</option>
@@ -163,11 +163,11 @@ const UsersManagement = () => {
             </select>
           </div>
           <div>
-            <label className="block text-white text-sm font-medium mb-2">📊 Status</label>
+            <label className="block text-black text-sm font-medium mb-2">📊 Status</label>
             <select
               value={filters.status}
               onChange={(e) => setFilters({...filters, status: e.target.value})}
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-black focus:ring-2 focus:ring-black focus:border-black transition-colors"
             >
               <option value="">All Status</option>
               <option value="active">Active</option>
@@ -178,30 +178,30 @@ const UsersManagement = () => {
       </div>
 
       {/* Users Table */}
-      <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-white text-xl">Loading users...</p>
+              <p className="text-black text-xl">Loading users...</p>
             </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-700 border-b border-slate-600">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-white font-medium">User</th>
-                  <th className="px-6 py-4 text-left text-white font-medium">Contact</th>
-                  <th className="px-6 py-4 text-left text-white font-medium">Role</th>
-                  <th className="px-6 py-4 text-left text-white font-medium">Status</th>
-                  <th className="px-6 py-4 text-left text-white font-medium">Joined</th>
-                  <th className="px-6 py-4 text-left text-white font-medium">Actions</th>
+                  <th className="px-6 py-4 text-left text-black font-medium">User</th>
+                  <th className="px-6 py-4 text-left text-black font-medium">Contact</th>
+                  <th className="px-6 py-4 text-left text-black font-medium">Role</th>
+                  <th className="px-6 py-4 text-left text-black font-medium">Status</th>
+                  <th className="px-6 py-4 text-left text-black font-medium">Joined</th>
+                  <th className="px-6 py-4 text-left text-black font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.map((user, index) => (
-                  <tr key={user.id} className="border-b border-slate-700 hover:bg-blue-600/10 transition-colors">
+                  <tr key={user.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3">
@@ -210,22 +210,22 @@ const UsersManagement = () => {
                           </span>
                         </div>
                         <div>
-                          <div className="text-white font-medium">{user.full_name || user.username}</div>
-                          <div className="text-slate-400 text-sm">@{user.username}</div>
+                          <div className="text-black font-medium">{user.full_name || user.username}</div>
+                          <div className="text-gray-600 text-sm">@{user.username}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-white text-sm">{user.email}</div>
-                        <div className="text-slate-400 text-sm">{user.phone || 'No phone'}</div>
+                        <div className="text-black text-sm">{user.email}</div>
+                        <div className="text-gray-600 text-sm">{user.phone || 'No phone'}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        user.role === 'admin' ? 'bg-red-600/20 text-red-400 border border-red-600/30' :
-                        user.role === 'organizer' ? 'bg-orange-600/20 text-orange-400 border border-orange-600/30' :
-                        'bg-blue-600/20 text-blue-400 border border-blue-600/30'
+                        user.role === 'admin' ? 'bg-red-100 text-red-700 border border-red-200' :
+                        user.role === 'organizer' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
+                        'bg-blue-100 text-blue-700 border border-blue-200'
                       }`}>
                         {user.role}
                       </span>
@@ -234,28 +234,28 @@ const UsersManagement = () => {
                       <div className="flex flex-col space-y-1">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           user.is_active 
-                            ? 'bg-green-600/20 text-green-400 border border-green-600/30' 
-                            : 'bg-red-600/20 text-red-400 border border-red-600/30'
+                            ? 'bg-green-100 text-green-700 border border-green-200' 
+                            : 'bg-red-100 text-red-700 border border-red-200'
                         }`}>
                           {user.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-slate-400">
+                    <td className="px-6 py-4 text-gray-600">
                       {formatDate(user.created_at)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleEdit(user)}
-                          className="p-2 bg-slate-700 rounded-lg hover:bg-blue-600/20 transition-colors"
+                          className="p-2 bg-gray-100 rounded-lg hover:bg-blue-100 transition-colors"
                           title="Edit User"
                         >
                           ✏️
                         </button>
                         <button
                           onClick={() => handleDelete(user.id)}
-                          className="p-2 bg-slate-700 rounded-lg hover:bg-red-600/20 transition-colors"
+                          className="p-2 bg-gray-100 rounded-lg hover:bg-red-100 transition-colors"
                           title="Delete User"
                         >
                           🗑️
@@ -273,17 +273,17 @@ const UsersManagement = () => {
       {filteredUsers.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">👥</div>
-          <h3 className="text-xl font-semibold text-white mb-2">No users found</h3>
-          <p className="text-slate-400">Try adjusting your search filters</p>
+          <h3 className="text-xl font-semibold text-black mb-2">No users found</h3>
+          <p className="text-gray-600">Try adjusting your search filters</p>
         </div>
       )}
 
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-2xl">
-            <div className="p-6 border-b border-slate-700">
-              <h3 className="text-2xl font-bold text-white">
+          <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-2xl shadow-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-2xl font-bold text-black">
                 {editingUser ? '✏️ Edit User' : '✨ Add New User'}
               </h3>
             </div>
@@ -291,32 +291,32 @@ const UsersManagement = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-white text-sm font-medium mb-2">Username *</label>
+                  <label className="block text-black text-sm font-medium mb-2">Username *</label>
                   <input
                     type="text"
                     required
                     value={formData.username}
                     onChange={(e) => setFormData({...formData, username: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:ring-2 focus:ring-black focus:border-black transition-colors"
                     placeholder="Enter username"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-white text-sm font-medium mb-2">Email *</label>
+                  <label className="block text-black text-sm font-medium mb-2">Email *</label>
                   <input
                     type="email"
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:ring-2 focus:ring-black focus:border-black transition-colors"
                     placeholder="Enter email"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-white text-sm font-medium mb-2">Full Name *</label>
+                <label className="block text-black text-sm font-medium mb-2">Full Name *</label>
                 <input
                   type="text"
                   required
@@ -329,18 +329,18 @@ const UsersManagement = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-white text-sm font-medium mb-2">Phone</label>
+                  <label className="block text-black text-sm font-medium mb-2">Phone</label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:ring-2 focus:ring-black focus:border-black transition-colors"
                     placeholder="Enter phone number"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-white text-sm font-medium mb-2">Role *</label>
+                  <label className="block text-black text-sm font-medium mb-2">Role *</label>
                   <select
                     required
                     value={formData.role}
@@ -362,15 +362,15 @@ const UsersManagement = () => {
                     id="is_active"
                     checked={formData.is_active}
                     onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                    className="w-4 h-4 text-comet-cyan bg-cosmic-glass border-starlight/20 rounded focus:ring-comet-cyan focus:ring-2"
+                    className="w-4 h-4 text-black bg-white border-gray-300 rounded focus:ring-black focus:ring-2"
                   />
-                  <label htmlFor="is_active" className="ml-2 text-starlight text-sm font-medium">
+                  <label htmlFor="is_active" className="ml-2 text-black text-sm font-medium">
                     Active user
                   </label>
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-4 pt-6 border-t border-starlight/10">
+              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -378,13 +378,13 @@ const UsersManagement = () => {
                     setEditingUser(null);
                     resetForm();
                   }}
-                  className="px-6 py-3 cosmic-glass border border-starlight/20 text-starlight rounded-xl hover:bg-cosmic-navy/20 transition-all"
+                  className="px-6 py-3 bg-white border border-gray-300 text-black rounded-xl hover:bg-gray-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-gradient-to-r from-comet-cyan to-plasma-purple hover:from-comet-cyan/80 hover:to-plasma-purple/80 text-starlight font-bold rounded-xl transition-all transform hover:scale-105 shadow-lg hover:shadow-comet-cyan/30 animate-glow"
+                  className="px-6 py-3 bg-black hover:bg-gray-800 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-lg"
                 >
                   {editingUser ? 'Update User' : 'Create User'}
                 </button>

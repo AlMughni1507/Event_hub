@@ -3,6 +3,7 @@ const { query } = require('../db');
 const { authenticateToken, requireUser } = require('../middleware/auth');
 const { validateRegistration, handleValidationErrors } = require('../middleware/validation');
 const ApiResponse = require('../middleware/response');
+const TokenService = require('../services/tokenService');
 
 const router = express.Router();
 
@@ -64,6 +65,9 @@ router.get('/my-registrations', async (req, res) => {
 // Register for an event
 router.post('/', validateRegistration, handleValidationErrors, async (req, res) => {
   try {
+    console.log('🚀 Registration request:', req.body);
+    console.log('👤 User:', req.user);
+
     const { event_id, payment_method = 'cash' } = req.body;
 
     // Check if event exists and is active
@@ -73,14 +77,28 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     );
 
     if (events.length === 0) {
+      console.log('❌ Event not found:', event_id);
       return ApiResponse.notFound(res, 'Event not found or inactive');
     }
 
     const event = events[0];
+    console.log('✅ Event found:', event.title);
 
-    // Check if event is in the future
-    if (new Date(event.event_date) <= new Date()) {
-      return ApiResponse.badRequest(res, 'Cannot register for past events');
+    // Check if event registration is still open (event hasn't started yet)
+    const now = new Date();
+    const eventDateTime = new Date(`${event.event_date} ${event.event_time}`);
+    
+    console.log('🕐 Current time:', now.toISOString());
+    console.log('🕐 Event time:', eventDateTime.toISOString());
+    console.log('🕐 Event date:', event.event_date);
+    console.log('🕐 Event time:', event.event_time);
+    
+    // Add some buffer time (1 hour) before closing registration
+    const registrationCloseTime = new Date(eventDateTime.getTime() - (60 * 60 * 1000)); // 1 hour before event
+    
+    if (now >= registrationCloseTime) {
+      console.log('❌ Registration closed - too close to event time');
+      return ApiResponse.badRequest(res, 'Pendaftaran sudah ditutup. Event akan dimulai kurang dari 1 jam lagi');
     }
 
     // Check if user already registered
@@ -90,6 +108,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     );
 
     if (existingRegistrations.length > 0) {
+      console.log('❌ User already registered');
       return ApiResponse.conflict(res, 'You have already registered for this event');
     }
 
@@ -101,15 +120,44 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
       );
 
       if (approvedRegistrations[0].count >= event.max_participants) {
+        console.log('❌ Event is full');
         return ApiResponse.conflict(res, 'Event is full');
       }
     }
 
+    console.log('✅ Creating registration...');
     // Create registration
     const [result] = await query(
-      'INSERT INTO event_registrations (user_id, event_id, payment_method, status) VALUES (?, ?, ?, "pending")',
+      'INSERT INTO event_registrations (user_id, event_id, payment_method, status) VALUES (?, ?, ?, "approved")',
       [req.user.id, event_id, payment_method]
     );
+
+    console.log('✅ Registration created:', result.insertId);
+
+    // Generate attendance token
+    console.log('🔑 Generating token...');
+    const tokenData = await TokenService.createAttendanceToken(
+      result.insertId,
+      req.user.id,
+      event_id
+    );
+
+    console.log('✅ Token generated:', tokenData.token);
+
+    // Send token via email
+    try {
+      console.log('📧 Sending token email...');
+      await TokenService.sendTokenEmail(
+        req.user.email,
+        req.user.full_name,
+        event.title,
+        tokenData.token
+      );
+      console.log('✅ Token email sent');
+    } catch (emailError) {
+      console.error('❌ Failed to send token email:', emailError);
+      // Don't fail registration if email fails
+    }
 
     // Get created registration
     const [registrations] = await query(
@@ -120,10 +168,16 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
       [result.insertId]
     );
 
-    return ApiResponse.created(res, registrations[0], 'Registration created successfully');
+    console.log('✅ Registration completed successfully');
+    return ApiResponse.created(res, {
+      ...registrations[0],
+      token: tokenData.token,
+      tokenExpiresAt: tokenData.expiresAt
+    }, 'Registration created successfully. Attendance token has been sent to your email.');
 
   } catch (error) {
-    console.error('Create registration error:', error);
+    console.error('❌ Create registration error:', error);
+    console.error('❌ Error stack:', error.stack);
     return ApiResponse.error(res, 'Failed to create registration');
   }
 });
@@ -195,4 +249,30 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Test token generation
+router.post('/test-token', async (req, res) => {
+  try {
+    console.log('🧪 Testing token generation...');
+    
+    // Generate test token
+    const tokenData = await TokenService.createAttendanceToken(
+      999, // fake registration ID
+      req.user.id,
+      req.body.event_id || 1
+    );
+
+    console.log('✅ Test token generated:', tokenData.token);
+
+    return ApiResponse.success(res, {
+      token: tokenData.token,
+      expiresAt: tokenData.expiresAt
+    }, 'Test token generated successfully');
+
+  } catch (error) {
+    console.error('❌ Test token error:', error);
+    return ApiResponse.error(res, 'Failed to generate test token');
+  }
+});
+
 module.exports = router;
+

@@ -140,4 +140,115 @@ router.get('/events/:id', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// Get monthly events statistics
+router.get('/monthly-events', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { year = new Date().getFullYear() } = req.query;
+    
+    const monthlyEvents = await query(`
+      SELECT 
+        MONTH(event_date) as month,
+        MONTHNAME(event_date) as month_name,
+        COUNT(*) as total_events
+      FROM events 
+      WHERE YEAR(event_date) = ? AND status = 'published'
+      GROUP BY MONTH(event_date), MONTHNAME(event_date)
+      ORDER BY MONTH(event_date)
+    `, [year]);
+
+    // Fill missing months with 0
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    const result = months.map((monthName, index) => {
+      const found = monthlyEvents.find(item => item.month === index + 1);
+      return {
+        month: index + 1,
+        month_name: monthName,
+        total_events: found ? found.total_events : 0
+      };
+    });
+
+    return ApiResponse.success(res, { monthlyEvents: result });
+
+  } catch (error) {
+    console.error('Monthly events error:', error);
+    return ApiResponse.error(res, 'Failed to fetch monthly events data');
+  }
+});
+
+// Get monthly participants statistics (from attendance records)
+router.get('/monthly-participants', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { year = new Date().getFullYear() } = req.query;
+    
+    const monthlyParticipants = await query(`
+      SELECT 
+        MONTH(e.event_date) as month,
+        MONTHNAME(e.event_date) as month_name,
+        COUNT(r.id) as total_participants
+      FROM events e
+      LEFT JOIN registrations r ON e.id = r.event_id 
+      WHERE YEAR(e.event_date) = ? 
+        AND e.status = 'published'
+        AND r.status = 'approved'
+        AND r.attendance_status = 'present'
+      GROUP BY MONTH(e.event_date), MONTHNAME(e.event_date)
+      ORDER BY MONTH(e.event_date)
+    `, [year]);
+
+    // Fill missing months with 0
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    const result = months.map((monthName, index) => {
+      const found = monthlyParticipants.find(item => item.month === index + 1);
+      return {
+        month: index + 1,
+        month_name: monthName,
+        total_participants: found ? found.total_participants : 0
+      };
+    });
+
+    return ApiResponse.success(res, { monthlyParticipants: result });
+
+  } catch (error) {
+    console.error('Monthly participants error:', error);
+    return ApiResponse.error(res, 'Failed to fetch monthly participants data');
+  }
+});
+
+// Get top 10 events by participant count
+router.get('/top-events', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const topEvents = await query(`
+      SELECT 
+        e.id,
+        e.title,
+        e.event_date,
+        c.name as category_name,
+        COUNT(r.id) as participant_count
+      FROM events e
+      LEFT JOIN registrations r ON e.id = r.event_id 
+        AND r.status = 'approved' 
+        AND r.attendance_status = 'present'
+      LEFT JOIN categories c ON e.category_id = c.id
+      WHERE e.status = 'published'
+      GROUP BY e.id, e.title, e.event_date, c.name
+      ORDER BY participant_count DESC
+      LIMIT 10
+    `);
+
+    return ApiResponse.success(res, { topEvents });
+
+  } catch (error) {
+    console.error('Top events error:', error);
+    return ApiResponse.error(res, 'Failed to fetch top events data');
+  }
+});
+
 module.exports = router;

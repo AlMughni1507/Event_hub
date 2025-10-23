@@ -13,6 +13,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastActivity, setLastActivity] = useState(Date.now());
 
   useEffect(() => {
     // Check if user is logged in from localStorage
@@ -23,6 +24,7 @@ export const AuthProvider = ({ children }) => {
         
         if (token && userData) {
           setUser(JSON.parse(userData));
+          setLastActivity(Date.now());
         }
       } catch (error) {
         console.error('Error checking auth status:', error);
@@ -36,8 +38,47 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
+  // Session timeout - 5 minutes
+  useEffect(() => {
+    if (!user) return;
+
+    const SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+    
+    const checkSessionTimeout = () => {
+      const now = Date.now();
+      const timeSinceLastActivity = now - lastActivity;
+      
+      if (timeSinceLastActivity >= SESSION_TIMEOUT) {
+        console.log('Session timeout - logging out user');
+        logout();
+      }
+    };
+
+    // Check timeout every minute
+    const timeoutCheckInterval = setInterval(checkSessionTimeout, 60000);
+    
+    // Update last activity on user interaction
+    const updateActivity = () => {
+      setLastActivity(Date.now());
+    };
+
+    // Listen for user activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => {
+      document.addEventListener(event, updateActivity, true);
+    });
+
+    return () => {
+      clearInterval(timeoutCheckInterval);
+      events.forEach(event => {
+        document.removeEventListener(event, updateActivity, true);
+      });
+    };
+  }, [user, lastActivity]);
+
   const login = (userData, token) => {
     setUser(userData);
+    setLastActivity(Date.now());
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
   };

@@ -23,8 +23,64 @@ const CategoriesManagement = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await categoriesAPI.getAll();
-      setCategories(response.data.categories || []);
+      // Use simplified categories from database
+      const simplifiedCategories = [
+        { 
+          id: 71, 
+          name: 'Technology', 
+          description: 'Tech events, programming, IT conferences',
+          icon: 'fas fa-laptop-code', 
+          color: '#007bff',
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        { 
+          id: 72, 
+          name: 'Business', 
+          description: 'Business conferences, networking, entrepreneurship',
+          icon: 'fas fa-briefcase', 
+          color: '#28a745',
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        { 
+          id: 73, 
+          name: 'Education', 
+          description: 'Workshops, seminars, training, learning events',
+          icon: 'fas fa-graduation-cap', 
+          color: '#ffc107',
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        { 
+          id: 74, 
+          name: 'Entertainment', 
+          description: 'Music, concerts, festivals, entertainment',
+          icon: 'fas fa-music', 
+          color: '#dc3545',
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        { 
+          id: 75, 
+          name: 'Sports', 
+          description: 'Sports events, competitions, fitness activities',
+          icon: 'fas fa-running', 
+          color: '#fd7e14',
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        { 
+          id: 76, 
+          name: 'Community', 
+          description: 'Community events, charity, social gatherings',
+          icon: 'fas fa-users', 
+          color: '#6f42c1',
+          is_active: true,
+          created_at: new Date().toISOString()
+        }
+      ];
+      setCategories(simplifiedCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
     } finally {
@@ -34,21 +90,11 @@ const CategoriesManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      if (editingCategory) {
-        await categoriesAPI.update(editingCategory.id, formData);
-      } else {
-        await categoriesAPI.create(formData);
-      }
-      
-      setShowModal(false);
-      setEditingCategory(null);
-      resetForm();
-      fetchCategories();
-    } catch (error) {
-      console.error('Error saving category:', error);
-      alert('Error saving category. Please try again.');
-    }
+    // Categories are now fixed - show message that editing is disabled
+    alert('Categories are now fixed to 6 main types: Technology, Business, Education, Entertainment, Sports, Community. Editing is disabled.');
+    setShowModal(false);
+    setEditingCategory(null);
+    resetForm();
   };
 
   const handleEdit = (category) => {
@@ -108,8 +154,8 @@ const CategoriesManagement = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">📂 Categories Management</h1>
-          <p className="text-slate-400">Organize events into categories</p>
+          <h1 className="text-3xl font-bold text-black mb-2">📂 Categories Management</h1>
+          <p className="text-gray-600">Organize events into categories</p>
         </div>
         <button
           onClick={() => {
@@ -117,22 +163,22 @@ const CategoriesManagement = () => {
             resetForm();
             setShowModal(true);
           }}
-          className="mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+          className="mt-4 md:mt-0 bg-black hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-xl transition-colors"
         >
           ✨ Create New Category
         </button>
       </div>
 
       {/* Search */}
-      <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
         <div className="max-w-md">
-          <label className="block text-white text-sm font-medium mb-2">🔍 Search Categories</label>
+          <label className="block text-black text-sm font-medium mb-2">🔍 Search Categories</label>
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by name or description..."
-            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:ring-2 focus:ring-black focus:border-black transition-colors"
           />
         </div>
       </div>
@@ -142,13 +188,13 @@ const CategoriesManagement = () => {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-white text-xl">Loading categories...</p>
+            <p className="text-black text-xl">Loading categories...</p>
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCategories.map((category, index) => (
-            <div key={category.id} className="bg-slate-800 p-6 rounded-2xl border border-slate-700 hover:border-blue-500 transition-colors">
+            <div key={category.id} className="bg-white p-6 rounded-2xl border border-gray-200 hover:border-gray-400 transition-colors shadow-sm">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center">
                   <div 
@@ -162,12 +208,12 @@ const CategoriesManagement = () => {
                     )}
                   </div>
                   <div className="ml-4">
-                    <h3 className="text-white font-bold text-lg">{category.name}</h3>
+                    <h3 className="text-black font-bold text-lg">{category.name}</h3>
                     <div className="flex items-center mt-1">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                         category.is_active 
-                          ? 'bg-green-600/20 text-green-400 border border-green-600/30' 
-                          : 'bg-red-600/20 text-red-400 border border-red-600/30'
+                          ? 'bg-green-100 text-green-700 border border-green-200' 
+                          : 'bg-red-100 text-red-700 border border-red-200'
                       }`}>
                         {category.is_active ? 'Active' : 'Inactive'}
                       </span>
@@ -178,14 +224,14 @@ const CategoriesManagement = () => {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleEdit(category)}
-                    className="p-2 bg-slate-700 rounded-lg hover:bg-blue-600/20 transition-colors"
+                    className="p-2 bg-gray-100 rounded-lg hover:bg-blue-100 transition-colors"
                     title="Edit Category"
                   >
                     ✏️
                   </button>
                   <button
                     onClick={() => handleDelete(category.id)}
-                    className="p-2 bg-slate-700 rounded-lg hover:bg-red-600/20 transition-colors"
+                    className="p-2 bg-gray-100 rounded-lg hover:bg-red-100 transition-colors"
                     title="Delete Category"
                   >
                     🗑️
@@ -193,13 +239,13 @@ const CategoriesManagement = () => {
                 </div>
               </div>
               
-              <p className="text-slate-400 text-sm mb-4">
+              <p className="text-gray-600 text-sm mb-4">
                 {category.description || 'No description available'}
               </p>
               
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Events: {category.event_count || 0}</span>
-                <span className="text-slate-400">Created: {new Date(category.created_at).toLocaleDateString()}</span>
+                <span className="text-gray-600">Events: {category.event_count || 0}</span>
+                <span className="text-gray-600">Created: {new Date(category.created_at).toLocaleDateString()}</span>
               </div>
             </div>
           ))}
@@ -209,8 +255,8 @@ const CategoriesManagement = () => {
       {filteredCategories.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📂</div>
-          <h3 className="text-xl font-semibold text-white mb-2">No categories found</h3>
-          <p className="text-slate-400">
+          <h3 className="text-xl font-semibold text-black mb-2">No categories found</h3>
+          <p className="text-gray-600">
             {searchTerm ? 'Try adjusting your search terms' : 'Create your first category to get started'}
           </p>
         </div>

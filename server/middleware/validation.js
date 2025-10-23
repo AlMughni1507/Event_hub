@@ -26,8 +26,8 @@ const validateUserRegistration = [
   
   body('phone')
     .optional()
-    .isMobilePhone()
-    .withMessage('Please provide a valid phone number')
+    .matches(/^[0-9+\-\s()]{8,15}$/)
+    .withMessage('Phone number must be 8-15 digits and can contain +, -, spaces, and parentheses')
 ];
 
 const validateUserLogin = [

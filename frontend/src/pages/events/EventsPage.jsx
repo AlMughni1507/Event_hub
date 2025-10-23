@@ -1,48 +1,103 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { eventsAPI, categoriesAPI } from '../../services/api';
-import FallingStars from '../../components/FallingStars';
+import ResponsiveNavbar from '../../components/ResponsiveNavbar';
+import { 
+  Sparkles, 
+  Laptop, 
+  Briefcase, 
+  GraduationCap, 
+  Music, 
+  Trophy, 
+  Users,
+  Search,
+  Calendar,
+  MapPin,
+  Clock,
+  Ticket,
+  ArrowRight
+} from 'lucide-react';
 
 const EventsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('date_asc');
+  const [timeFilter, setTimeFilter] = useState('all');
   const [isLoaded, setIsLoaded] = useState(false);
   const [events, setEvents] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
+
+  // Handle navbar scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [sortBy, timeFilter]);
+
+  useEffect(() => {
+    // Debounce search
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.length >= 2 || searchTerm.length === 0) {
+        fetchData();
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Fetch categories and events in parallel
-      const [categoriesResponse, eventsResponse] = await Promise.all([
-        categoriesAPI.getAll({ is_active: true }),
-        eventsAPI.getAll({ limit: 50 })
-      ]);
+      console.log('🚀 Starting to fetch data...');
       
-      // Add 'all' category at the beginning
+      // Fetch events first
+      console.log('📡 Fetching events...');
+      const eventsResponse = await eventsAPI.getAll({ 
+        limit: 50, 
+        search: searchTerm,
+        category_id: selectedCategory !== 'all' ? selectedCategory : '',
+        sort_by: sortBy,
+        upcoming: timeFilter === 'upcoming' ? 'true' : ''
+      });
+      console.log('📡 Events response:', eventsResponse);
+      
+      // Use simplified categories from database with Lucide icons
       const allCategories = [
-        { id: 'all', name: 'Semua Kategori', icon: '🎪' },
-        ...categoriesResponse.data.categories.map(cat => ({
-          id: cat.id,
-          name: cat.name,
-          icon: cat.icon || '🎪'
-        }))
+        { id: 'all', name: 'Semua Kategori', icon: Sparkles },
+        { id: '71', name: 'Technology', icon: Laptop },
+        { id: '72', name: 'Business', icon: Briefcase },
+        { id: '73', name: 'Education', icon: GraduationCap },
+        { id: '74', name: 'Entertainment', icon: Music },
+        { id: '75', name: 'Sports', icon: Trophy },
+        { id: '76', name: 'Community', icon: Users }
       ];
       
       setCategories(allCategories);
-      setEvents(eventsResponse.data.events || []);
+      
+      // Get events from response
+      const events = eventsResponse?.data?.events || eventsResponse?.events || [];
+      console.log('📋 Raw events from API:', events);
+      console.log('📅 Current date:', new Date());
+      
+      // Show all events for now (remove filter temporarily)
+      console.log('📋 All events (no filter):', events);
+      setEvents(events);
       setIsLoaded(true);
+      
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('❌ Error fetching data:', err);
       setError('Gagal memuat data. Silakan coba lagi.');
     } finally {
       setLoading(false);
@@ -76,16 +131,23 @@ const EventsPage = () => {
 
   const getCategoryIcon = (categoryName) => {
     const iconMap = {
-      'olahraga': '🏃‍♂️',
-      'seminar': '🎓',
-      'pertunjukan': '🎭',
-      'pameran': '🎪',
-      'workshop': '🛠️',
-      'konser': '🎵',
-      'festival': '🎉',
-      'kompetisi': '🏆'
+      'technology': Laptop,
+      'business': Briefcase,
+      'education': GraduationCap,
+      'entertainment': Music,
+      'sports': Trophy,
+      'community': Users,
+      'olahraga': Trophy,
+      'seminar': GraduationCap,
+      'pertunjukan': Music,
+      'pameran': Sparkles,
+      'workshop': Briefcase,
+      'konser': Music,
+      'festival': Sparkles,
+      'kompetisi': Trophy
     };
-    return iconMap[categoryName?.toLowerCase()] || '🎪';
+    const IconComponent = iconMap[categoryName?.toLowerCase()] || Sparkles;
+    return <IconComponent className="h-16 w-16 text-gray-400" />;
   };
 
   const filteredEvents = events.filter(event => {
@@ -101,134 +163,166 @@ const EventsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-deep-space relative overflow-hidden">
-      {/* Falling Stars Background */}
-      <FallingStars density="medium" />
-      {/* Cosmic Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-comet-cyan/10 rounded-full blur-3xl animate-cosmic-pulse"></div>
-        <div className="absolute bottom-20 right-20 w-80 h-80 bg-plasma-purple/10 rounded-full blur-3xl animate-stellar-drift"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-aurora-green/8 rounded-full blur-3xl animate-nebula-swirl"></div>
-        <div className="absolute top-10 right-10 w-48 h-48 bg-nebula-pink/8 rounded-full blur-2xl animate-space-float"></div>
-        
-        {/* Floating cosmic particles */}
-        <div className="absolute top-1/4 left-1/4 w-4 h-4 bg-starlight/15 rounded-full animate-cosmic-twinkle" style={{animationDelay: '0.5s'}}></div>
-        <div className="absolute top-3/4 right-1/4 w-3 h-3 bg-comet-cyan/25 rounded-full animate-stellar-drift" style={{animationDelay: '1.2s'}}></div>
-        <div className="absolute top-1/2 right-1/3 w-2 h-2 bg-plasma-purple/30 rounded-full animate-cosmic-pulse" style={{animationDelay: '2s'}}></div>
-        <div className="absolute bottom-1/3 left-1/3 w-5 h-5 bg-aurora-green/20 rounded-full animate-space-float" style={{animationDelay: '1.8s'}}></div>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;600;700;900&display=swap');
+        .font-bebas { font-family: 'Bebas Neue', cursive; }
+        .font-poppins { font-family: 'Poppins', sans-serif; }
+      `}</style>
 
-      {/* Navigation */}
-      <nav className="cosmic-glass border-b border-starlight/10 fixed w-full z-50">
+      {/* Custom Transparent Navbar like HomePage */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled 
+          ? 'bg-black/90 backdrop-blur-md shadow-lg' 
+          : 'bg-transparent'
+      }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <button 
-                onClick={handleBackToHome}
-                className="flex items-center text-starlight hover:text-comet-cyan transition-colors group animate-slide-in-left"
-              >
-                <svg className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Kembali ke Beranda
-              </button>
-            </div>
-            
-            <div className="flex items-center animate-slide-in-right">
-              <div className="w-8 h-8 bg-gradient-to-r from-comet-cyan to-plasma-purple rounded-full flex items-center justify-center animate-glow">
-                <svg className="w-5 h-5 text-starlight animate-cosmic-twinkle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+          <div className="flex items-center justify-between h-20">
+            {/* Logo */}
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+              <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-white" />
               </div>
+              <span className="font-bebas text-2xl text-white tracking-wider">EVENTHUB</span>
+            </div>
+
+            {/* Desktop Menu */}
+            <div className="hidden md:flex items-center gap-8">
+              <button onClick={() => navigate('/')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Home</button>
+              <button onClick={() => navigate('/events')} className="font-poppins text-pink-400 font-semibold">Events</button>
+              <button onClick={() => navigate('/blog')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Blog</button>
+              <button onClick={() => navigate('/contact')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Contact</button>
+              <button onClick={() => navigate('/about')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">About</button>
+            </div>
+
+            {/* CTA Button */}
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => navigate('/login')}
+                className="hidden md:block font-poppins px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
+              >
+                Get Started
+              </button>
+              
+              {/* Mobile Menu Button */}
+              <button className="md:hidden text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Header Section */}
-      <section className="pt-20 pb-8 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-deep-space/95 via-cosmic-navy/30 to-void-black/95"></div>
-        
-        {/* Background Elements */}
-        <div className="absolute top-10 left-10 w-72 h-72 bg-comet-cyan/8 rounded-full blur-3xl animate-cosmic-pulse"></div>
-        <div className="absolute bottom-10 right-10 w-64 h-64 bg-plasma-purple/8 rounded-full blur-2xl animate-stellar-drift"></div>
-        
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-starlight mb-6 animate-fade-in-up">
-              Event Terbaru
-            </h1>
-            <p className="text-lg md:text-xl text-moon-silver mb-8 max-w-3xl mx-auto animate-slide-in-left">
-              Temukan event menarik yang sesuai dengan minat Anda dan bergabunglah dengan komunitas yang luar biasa
-            </p>
-            
+      {/* Hero Header */}
+      <div className="relative bg-gradient-to-r from-purple-900 via-purple-800 to-pink-900 pt-24 pb-16">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="font-bebas text-5xl md:text-7xl text-white mb-4 tracking-wider">LATEST EVENTS</h1>
+          <p className="font-poppins text-xl text-purple-200 max-w-2xl mx-auto">Find exciting events that match your interests and join an amazing community</p>
+        </div>
+      </div>
+
+      {/* Search & Filter Section */}
+      <div className="bg-white shadow-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col gap-4">
             {/* Search Bar */}
-            <div className="max-w-md mx-auto mb-8 animate-zoom-in">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Cari event..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 pl-10 cosmic-glass border border-starlight/20 rounded-xl text-starlight placeholder-moon-silver focus:ring-2 focus:ring-comet-cyan focus:border-comet-cyan transition-all animate-glow"
-                />
-                <svg className="absolute left-3 top-3.5 h-5 w-5 text-moon-silver animate-cosmic-twinkle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search events..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl font-poppins focus:outline-none focus:border-purple-500 transition-colors"
+              />
             </div>
 
             {/* Category Filters */}
-            <div className="flex flex-wrap justify-center gap-3 mb-8">
-              {categories.map((category, index) => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`px-6 py-3 rounded-xl text-sm font-medium transition-all flex items-center animate-zoom-in animate-glow ${
-                    selectedCategory === category.id
-                      ? 'bg-gradient-to-r from-comet-cyan to-plasma-purple text-starlight shadow-lg shadow-comet-cyan/30'
-                      : 'cosmic-glass text-moon-silver hover:bg-cosmic-navy/20 border border-starlight/20'
-                  }`}
-                  style={{animationDelay: `${index * 0.1}s`}}
-                >
-                  <span className="mr-2 text-lg animate-cosmic-twinkle">{category.icon}</span>
-                  {category.name}
-                </button>
-              ))}
+            <div className="flex flex-wrap gap-2 justify-center">
+              {categories.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-poppins font-semibold text-sm transition-all ${
+                      selectedCategory === category.id
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {category.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Time & Sort Filters */}
+            <div className="flex flex-wrap gap-4 justify-center">
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-200 rounded-lg font-poppins text-sm focus:outline-none focus:border-purple-500"
+              >
+                <option value="all">All Time</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="today">Today</option>
+                <option value="this_week">This Week</option>
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-200 rounded-lg font-poppins text-sm focus:outline-none focus:border-purple-500"
+              >
+                <option value="date_asc">Nearest</option>
+                <option value="date_desc">Farthest</option>
+                <option value="title_asc">A-Z</option>
+                <option value="title_desc">Z-A</option>
+                <option value="price_asc">Lowest Price</option>
+                <option value="price_desc">Highest Price</option>
+              </select>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* Events Grid */}
-      <section className="py-8 relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute top-20 left-20 w-64 h-64 bg-plasma-purple/5 rounded-full blur-3xl animate-stellar-drift"></div>
-        <div className="absolute bottom-20 right-20 w-48 h-48 bg-aurora-green/5 rounded-full blur-2xl animate-cosmic-pulse"></div>
-        
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           {loading ? (
             <div className="text-center py-12 animate-fade-in-up">
-              <div className="text-6xl mb-4 animate-spin">⏳</div>
-              <h3 className="text-xl font-semibold text-starlight mb-2 animate-cosmic-twinkle">Memuat event...</h3>
-              <p className="text-moon-silver animate-fade-in-up">Mohon tunggu sebentar</p>
+              <div className="flex justify-center mb-4">
+                <div className="animate-spin">
+                  <Clock className="h-16 w-16 text-gray-400" />
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Memuat event...</h3>
+              <p className="text-gray-600">Mohon tunggu sebentar</p>
             </div>
           ) : error || events.length === 0 ? (
             <div className="text-center py-12 animate-fade-in-up">
-              <div className="text-6xl mb-4 animate-bounce-slow">🎪</div>
-              <h3 className="text-xl font-semibold text-starlight mb-2 animate-cosmic-twinkle">Event Coming Soon</h3>
-              <p className="text-moon-silver mb-6 animate-fade-in-up">Event menarik akan segera hadir. Pantau terus untuk update terbaru!</p>
+              <div className="flex justify-center mb-4">
+                <div className="animate-bounce">
+                  <Sparkles className="h-16 w-16 text-gray-400" />
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Event Coming Soon</h3>
+              <p className="text-gray-600 mb-6">Event menarik akan segera hadir. Pantau terus untuk update terbaru!</p>
               <div className="flex gap-4 justify-center">
                 <button 
                   onClick={handleBackToHome}
-                  className="bg-gradient-to-r from-comet-cyan to-plasma-purple hover:from-comet-cyan/80 hover:to-plasma-purple/80 text-starlight font-medium py-2 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg hover:shadow-comet-cyan/30 animate-glow"
+                  className="bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
                 >
                   Kembali ke Beranda
                 </button>
                 {error && (
                   <button 
                     onClick={fetchData}
-                    className="cosmic-glass border border-starlight/20 hover:bg-cosmic-navy/20 text-starlight font-medium py-2 px-6 rounded-xl transition-all transform hover:scale-105 animate-glow"
+                    className="bg-white/80 backdrop-blur-sm border border-gray-200 hover:bg-gray-100 text-gray-700 font-medium py-2 px-6 rounded-xl transition-all transform hover:scale-105"
                   >
                     Coba Lagi
                   </button>
@@ -237,16 +331,18 @@ const EventsPage = () => {
             </div>
           ) : filteredEvents.length === 0 ? (
             <div className="text-center py-12 animate-fade-in-up">
-              <div className="text-6xl mb-4 animate-bounce-slow">🔍</div>
-              <h3 className="text-xl font-semibold text-starlight mb-2 animate-cosmic-twinkle">Tidak ada event ditemukan</h3>
-              <p className="text-moon-silver animate-fade-in-up">Coba ubah filter atau kata kunci pencarian Anda</p>
+              <div className="flex justify-center mb-4">
+                <Search className="h-16 w-16 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Tidak ada event ditemukan</h3>
+              <p className="text-gray-600">Coba ubah filter atau kata kunci pencarian Anda</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filteredEvents.map((event, index) => (
-                <div key={event.id} className="cosmic-glass rounded-2xl overflow-hidden border border-starlight/10 hover:border-comet-cyan/50 transition-all group cursor-pointer animate-zoom-in animate-glow" style={{animationDelay: `${index * 0.2}s`}}>
+                <div key={event.id} onClick={() => navigate(`/events/${event.id}`)} className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-400 hover:shadow-xl transition-all group cursor-pointer animate-zoom-in" style={{animationDelay: `${index * 0.2}s`}}>
                   {/* Event Image */}
-                  <div className="h-48 bg-gradient-to-br from-comet-cyan/30 to-plasma-purple/30 flex items-center justify-center relative overflow-hidden">
+                  <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative overflow-hidden">
                     {event.image ? (
                       <img 
                         src={event.image} 
@@ -258,61 +354,52 @@ const EventsPage = () => {
                         }}
                       />
                     ) : null}
-                    <div className="text-6xl group-hover:scale-110 transition-transform animate-cosmic-twinkle" style={{display: event.image ? 'none' : 'flex'}}>
+                    <div className="text-6xl group-hover:scale-110 transition-transform" style={{display: event.image ? 'none' : 'flex'}}>
                       {getCategoryIcon(event.category_name)}
                     </div>
-                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-all"></div>
+                    <div className="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition-all"></div>
                     
-                    {/* Floating cosmic particles in event cards */}
-                    <div className="absolute top-4 right-4 w-2 h-2 bg-starlight/30 rounded-full animate-cosmic-twinkle"></div>
-                    <div className="absolute bottom-4 left-4 w-1 h-1 bg-comet-cyan/50 rounded-full animate-stellar-drift"></div>
-                    <div className="absolute top-1/2 left-4 w-1.5 h-1.5 bg-plasma-purple/40 rounded-full animate-cosmic-pulse"></div>
+                    {/* Floating particles in event cards */}
+                    <div className="absolute top-4 right-4 w-2 h-2 bg-gray-400 rounded-full opacity-30 animate-pulse"></div>
+                    <div className="absolute bottom-4 left-4 w-1 h-1 bg-gray-500 rounded-full opacity-40 animate-bounce"></div>
+                    <div className="absolute top-1/2 left-4 w-1.5 h-1.5 bg-gray-600 rounded-full opacity-50 animate-pulse"></div>
                   </div>
                   
                   {/* Event Content */}
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium cosmic-glass text-comet-cyan border border-comet-cyan/30 animate-glow">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300">
                         {event.category_name || 'Umum'}
                       </span>
-                      <span className="text-sm text-moon-silver animate-fade-in-up">{formatDate(event.event_date)}</span>
+                      <span className="text-sm text-gray-500">{formatDate(event.event_date)}</span>
                     </div>
                     
-                    <h3 className="text-xl font-semibold text-starlight mb-2 group-hover:text-comet-cyan transition-colors">{event.title}</h3>
-                    <p className="text-moon-silver text-sm mb-4 line-clamp-2">{event.short_description || event.description}</p>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-gray-700 transition-colors">{event.title}</h3>
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">{event.short_description || event.description}</p>
                     
                     <div className="space-y-2 mb-4">
-                      <div className="flex items-center text-sm text-moon-silver group-hover:text-comet-cyan transition-colors">
-                        <svg className="w-4 h-4 mr-2 animate-cosmic-twinkle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                      <div className="flex items-center text-sm text-gray-500 group-hover:text-gray-700 transition-colors">
+                        <Clock className="w-4 h-4 mr-2" />
                         {formatTime(event.event_time)}
                       </div>
-                      <div className="flex items-center text-sm text-moon-silver group-hover:text-aurora-green transition-colors">
-                        <svg className="w-4 h-4 mr-2 animate-stellar-drift" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
+                      <div className="flex items-center text-sm text-gray-500 group-hover:text-gray-700 transition-colors">
+                        <MapPin className="w-4 h-4 mr-2" />
                         {event.location || 'Lokasi TBA'}
                       </div>
-                      <div className="flex items-center text-sm text-moon-silver group-hover:text-nebula-pink transition-colors">
-                        <svg className="w-4 h-4 mr-2 animate-scale-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
+                      <div className="flex items-center text-sm text-gray-500 group-hover:text-gray-700 transition-colors">
+                        <Users className="w-4 h-4 mr-2" />
                         {event.approved_registrations || event.current_participants || 0}/{event.max_participants || '∞'} peserta
                       </div>
                     </div>
                     
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-cosmic animate-gradient-shift bg-[length:200%_200%]">
+                      <span className="text-lg font-bold text-gray-900">
                         {formatPrice(event.price, event.is_free)}
                       </span>
-                      <button className="bg-gradient-to-r from-comet-cyan to-plasma-purple hover:from-comet-cyan/80 hover:to-plasma-purple/80 text-starlight font-medium py-2 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg hover:shadow-comet-cyan/30 animate-glow">
+                      <button className="bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg">
                         <span className="flex items-center gap-2">
                           Daftar Sekarang
-                          <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                          </svg>
+                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </span>
                       </button>
                     </div>
@@ -321,8 +408,7 @@ const EventsPage = () => {
               ))}
             </div>
           )}
-        </div>
-      </section>
+      </div>
     </div>
   );
 };

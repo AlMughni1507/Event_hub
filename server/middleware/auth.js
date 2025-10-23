@@ -13,6 +13,18 @@ const authenticateToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
+    // Check session timeout - 5 minutes
+    const now = Math.floor(Date.now() / 1000);
+    const tokenAge = now - decoded.iat;
+    
+    if (tokenAge > 300) { // 5 minutes = 300 seconds
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired. Please login again.',
+        code: 'SESSION_EXPIRED'
+      });
+    }
+    
     // Get user from database
     const [users] = await query(
       'SELECT id, username, email, full_name, role, is_active FROM users WHERE id = ?',
@@ -36,7 +48,11 @@ const authenticateToken = async (req, res, next) => {
       return ApiResponse.unauthorized(res, 'Invalid token');
     }
     if (error.name === 'TokenExpiredError') {
-      return ApiResponse.unauthorized(res, 'Token expired');
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired. Please login again.',
+        code: 'SESSION_EXPIRED'
+      });
     }
     console.error('Auth middleware error:', error);
     return ApiResponse.error(res, 'Authentication failed');

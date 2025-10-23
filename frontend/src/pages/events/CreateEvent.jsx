@@ -1,26 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
-import '../../styles/theme.css';
 
 const CreateEvent = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     event_date: '',
     location: '',
     category_id: '',
-    max_participants: '',
-    registration_fee: '',
-    image_url: ''
+    max_participants: '50',
+    registration_fee: '0'
   });
+
+  console.log('CreateEvent component loaded');
 
   useEffect(() => {
     fetchCategories();
@@ -43,131 +39,81 @@ const CreateEvent = () => {
     }));
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadImage = async () => {
-    if (!imageFile) return null;
-
-    const imageFormData = new FormData();
-    imageFormData.append('image', imageFile);
-
-    try {
-      const response = await api.post('/upload/image', imageFormData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      return response.data.data.url;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw new Error('Failed to upload image');
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      let imageUrl = formData.image_url;
-      
-      // Upload image if selected
-      if (imageFile) {
-        imageUrl = await uploadImage();
-      }
+      // Split datetime-local into date and time
+      const dateTime = new Date(formData.event_date);
+      const eventDate = dateTime.toISOString().split('T')[0]; // YYYY-MM-DD
+      const eventTime = dateTime.toTimeString().split(' ')[0]; // HH:MM:SS
 
       const eventData = {
-        ...formData,
-        image_url: imageUrl,
+        title: formData.title,
+        description: formData.description,
+        short_description: formData.description.substring(0, 200), // Use first 200 chars
+        event_date: eventDate,
+        event_time: eventTime,
+        end_date: eventDate, // Same day for now
+        end_time: eventTime, // Same time for now
+        location: formData.location,
+        address: formData.location, // Use location as address
+        city: 'Jakarta', // Default city
+        province: 'DKI Jakarta', // Default province
+        category_id: parseInt(formData.category_id),
         max_participants: parseInt(formData.max_participants),
-        registration_fee: parseFloat(formData.registration_fee)
+        price: parseFloat(formData.registration_fee),
+        is_free: parseFloat(formData.registration_fee) === 0,
+        image_url: null,
+        banner: null,
+        status: 'published'
       };
 
+      console.log('Sending event data:', eventData);
       await api.post('/events', eventData);
       
-      alert('Event created successfully!');
-      navigate('/admin/events');
+      alert('Event berhasil dibuat!');
+      navigate('/events');
     } catch (error) {
       console.error('Error creating event:', error);
-      alert('Failed to create event. Please try again.');
+      const errorMsg = error?.message || 'Failed to create event. Please try again.';
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  if (!user || user.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-center">
-          <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
-          <p>You need admin privileges to create events.</p>
-        </div>
-      </div>
-    );
-  }
+  // Remove admin check - allow all users to create events
+  // if (!user || user.role !== 'admin') {
+  //   return (
+  //     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+  //       <div className="text-white text-center">
+  //         <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+  //         <p>You need admin privileges to create events.</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
-    <div className="min-h-screen bg-deep-space py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-cosmic mb-4">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent mb-4">
             🎪 Create New Event
           </h1>
-          <p className="text-xl text-moon-silver">
+          <p className="text-xl text-gray-300">
             Design an amazing experience for your audience
           </p>
         </div>
 
         {/* Form */}
-        <div className="cosmic-glass rounded-3xl shadow-2xl p-8">
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl shadow-2xl p-8">
           <form onSubmit={handleSubmit} className="space-y-8">
             
-            {/* Image Upload Section */}
-            <div className="text-center">
-              <label className="block text-lg font-semibold text-white mb-4">
-                📸 Event Image
-              </label>
-              
-              <div className="relative inline-block">
-                <div className="w-64 h-40 mx-auto bg-white/20 rounded-xl border-2 border-dashed border-white/40 flex items-center justify-center overflow-hidden">
-                  {imagePreview ? (
-                    <img 
-                      src={imagePreview} 
-                      alt="Preview" 
-                      className="w-full h-full object-cover rounded-xl"
-                    />
-                  ) : (
-                    <div className="text-center text-white/60">
-                      <div className="text-4xl mb-2">🖼️</div>
-                      <p>Click to upload image</p>
-                    </div>
-                  )}
-                </div>
-                
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-              </div>
-              
-              <p className="text-sm text-purple-200 mt-2">
-                Recommended: 1200x600px, max 5MB
-              </p>
-            </div>
-
             {/* Basic Info */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
@@ -254,39 +200,41 @@ const CreateEvent = () => {
               </div>
             </div>
 
-            {/* Participants and Fee */}
+            {/* Simple Options */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-white mb-2">
                   👥 Max Participants
                 </label>
-                <input
-                  type="number"
+                <select
                   name="max_participants"
                   value={formData.max_participants}
                   onChange={handleInputChange}
-                  required
-                  min="1"
-                  className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent backdrop-blur-sm"
-                  placeholder="Maximum number of participants"
-                />
+                  className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent backdrop-blur-sm"
+                >
+                  <option value="25" className="text-gray-800">25 orang</option>
+                  <option value="50" className="text-gray-800">50 orang</option>
+                  <option value="100" className="text-gray-800">100 orang</option>
+                  <option value="200" className="text-gray-800">200 orang</option>
+                </select>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-white mb-2">
-                  💰 Registration Fee (IDR)
+                  💰 Harga Tiket
                 </label>
-                <input
-                  type="number"
+                <select
                   name="registration_fee"
                   value={formData.registration_fee}
                   onChange={handleInputChange}
-                  required
-                  min="0"
-                  step="1000"
-                  className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent backdrop-blur-sm"
-                  placeholder="0 for free events"
-                />
+                  className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent backdrop-blur-sm"
+                >
+                  <option value="0" className="text-gray-800">Gratis</option>
+                  <option value="50000" className="text-gray-800">Rp 50.000</option>
+                  <option value="100000" className="text-gray-800">Rp 100.000</option>
+                  <option value="150000" className="text-gray-800">Rp 150.000</option>
+                  <option value="250000" className="text-gray-800">Rp 250.000</option>
+                </select>
               </div>
             </div>
 

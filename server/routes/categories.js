@@ -9,8 +9,7 @@ const router = express.Router();
 // Get all categories (public)
 router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', status = 'all' } = req.query;
-    const offset = (page - 1) * limit;
+    const { page, limit, search = '', status = 'all' } = req.query;
     
     let whereClause = '1=1';
     let params = [];
@@ -25,30 +24,41 @@ router.get('/', async (req, res) => {
       params.push(status === 'active' ? 1 : 0);
     }
 
-    const [categories] = await query(
-      `SELECT *, 
+    // If pagination parameters are provided, use them; otherwise get all categories
+    let categoriesQuery = `SELECT *, 
        (SELECT COUNT(*) FROM events WHERE category_id = categories.id) as event_count
        FROM categories 
        WHERE ${whereClause} 
-       ORDER BY name ASC 
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
-    );
+       ORDER BY name ASC`;
+    
+    let queryParams = [...params];
+    
+    if (page && limit) {
+      const offset = (page - 1) * limit;
+      categoriesQuery += ' LIMIT ? OFFSET ?';
+      queryParams.push(parseInt(limit), parseInt(offset));
+    }
+
+    const [categories] = await query(categoriesQuery, queryParams);
 
     const [totalResult] = await query(
       `SELECT COUNT(*) as total FROM categories WHERE ${whereClause}`,
       params
     );
 
-    return ApiResponse.success(res, {
-      categories,
-      pagination: {
+    const response = { categories };
+    
+    // Only include pagination if page/limit were requested
+    if (page && limit) {
+      response.pagination = {
         page: parseInt(page),
         limit: parseInt(limit),
         total: totalResult[0].total,
         totalPages: Math.ceil(totalResult[0].total / limit)
-      }
-    }, 'Categories retrieved successfully');
+      };
+    }
+
+    return ApiResponse.success(res, response, 'Categories retrieved successfully');
 
   } catch (error) {
     console.error('Get categories error:', error);
