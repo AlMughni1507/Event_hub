@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { TrendingUp, Users, ClipboardList, FolderKanban, Activity } from 'lucide-react';
 import { eventsAPI, usersAPI, registrationsAPI, categoriesAPI } from '../../services/api';
 
 const Analytics = () => {
@@ -130,21 +131,21 @@ const Analytics = () => {
         <StatCard
           title="Active Users"
           value={analytics.totalUsers}
-          icon="👥"
+          icon={<Users className="w-8 h-8 text-green-400" />}
           color="text-green-400"
           change={8}
         />
         <StatCard
           title="Registrations"
           value={analytics.totalRegistrations}
-          icon="📝"
+          icon={<ClipboardList className="w-8 h-8 text-purple-400" />}
           color="text-purple-400"
           change={25}
         />
         <StatCard
           title="Categories"
           value={analytics.totalCategories}
-          icon="📂"
+          icon={<FolderKanban className="w-8 h-8 text-pink-400" />}
           color="text-pink-400"
           change={5}
         />
@@ -205,7 +206,7 @@ const Analytics = () => {
           {analytics.recentActivity.map((activity, index) => (
             <div key={activity.id} className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
               <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                📝
+                <Activity className="w-5 h-5 text-green-600" />
               </div>
               <div className="flex-1">
                 <p className="text-black">

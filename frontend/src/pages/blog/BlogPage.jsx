@@ -134,7 +134,6 @@ const BlogPage = () => {
               <button onClick={() => navigate('/events')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Events</button>
               <button onClick={() => navigate('/blog')} className="font-poppins text-pink-400 font-semibold">Blog</button>
               <button onClick={() => navigate('/contact')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Contact</button>
-              <button onClick={() => navigate('/about')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">About</button>
             </div>
 
             {/* CTA Button */}

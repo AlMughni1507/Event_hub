@@ -8,7 +8,7 @@
     "start": "node server",
     "dev": "nodemon server",
     "create-db": "node create-database.js",
-    "migrate": "node migrations/run-migrations.js",
+    "migrate": "node migrations/runMigration.js",
     "setup": "npm run create-db && npm run migrate"
   },
   "keywords": [],

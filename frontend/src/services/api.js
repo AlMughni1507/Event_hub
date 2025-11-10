@@ -38,8 +38,28 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const errorData = error.response.data;
       
+      // Check if user is admin - admin sessions never expire
+      const userData = localStorage.getItem('user');
+      let isAdmin = false;
+      
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          isAdmin = user.role === 'admin';
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+      
+      // Skip logout for admin users
+      if (isAdmin) {
+        console.log('⚠️ 401 error for admin user - keeping session active');
+        // Return the error but don't logout
+        return Promise.reject(error.response?.data || error.message);
+      }
+      
       if (errorData?.code === 'SESSION_EXPIRED') {
-        // Show session expired message
+        // Show session expired message (only for non-admin)
         alert('Session expired. You will be redirected to login page.');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -47,7 +67,7 @@ api.interceptors.response.use(
         return;
       }
       
-      // Regular unauthorized
+      // Regular unauthorized (only for non-admin)
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -152,6 +172,9 @@ export const blogsAPI = {
 export const adminAPI = {
   getDashboardStats: () => api.get('/admin/dashboard/stats'),
   getAnalytics: (params) => api.get('/admin/analytics', { params }),
+  getAllEvents: (params) => api.get('/admin/events', { params }),
+  getAllUsers: (params) => api.get('/admin/users', { params }),
+  getAllRegistrations: (params) => api.get('/admin/registrations', { params }),
 };
 
 // Attendance API

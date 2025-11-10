@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import ResponsiveNavbar from '../../components/ResponsiveNavbar';
 import { eventsAPI } from '../../services/api';
 
 const SlideSkeleton = () => (
@@ -121,8 +120,6 @@ const EventDashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#0b0b10] text-white">
-      <ResponsiveNavbar />
-
       {/* Hero Slideshow */}
       <section
         className="relative w-full overflow-hidden"

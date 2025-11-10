@@ -38,9 +38,15 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
-  // Session timeout - 5 minutes
+  // Session timeout - 5 minutes (ONLY for visitors, NOT for admin)
   useEffect(() => {
     if (!user) return;
+
+    // Skip session timeout for admin users
+    if (user.role === 'admin') {
+      console.log('Admin user - session timeout disabled');
+      return;
+    }
 
     const SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
     

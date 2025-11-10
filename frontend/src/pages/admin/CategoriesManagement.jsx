@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmModal from '../../components/ConfirmModal';
+import { FolderKanban, Plus, Edit, Trash2, Search } from 'lucide-react';
 import { categoriesAPI } from '../../services/api';
 
 const CategoriesManagement = () => {
+  const toast = useToast();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -23,66 +28,16 @@ const CategoriesManagement = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      // Use simplified categories from database
-      const simplifiedCategories = [
-        { 
-          id: 71, 
-          name: 'Technology', 
-          description: 'Tech events, programming, IT conferences',
-          icon: 'fas fa-laptop-code', 
-          color: '#007bff',
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        { 
-          id: 72, 
-          name: 'Business', 
-          description: 'Business conferences, networking, entrepreneurship',
-          icon: 'fas fa-briefcase', 
-          color: '#28a745',
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        { 
-          id: 73, 
-          name: 'Education', 
-          description: 'Workshops, seminars, training, learning events',
-          icon: 'fas fa-graduation-cap', 
-          color: '#ffc107',
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        { 
-          id: 74, 
-          name: 'Entertainment', 
-          description: 'Music, concerts, festivals, entertainment',
-          icon: 'fas fa-music', 
-          color: '#dc3545',
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        { 
-          id: 75, 
-          name: 'Sports', 
-          description: 'Sports events, competitions, fitness activities',
-          icon: 'fas fa-running', 
-          color: '#fd7e14',
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        { 
-          id: 76, 
-          name: 'Community', 
-          description: 'Community events, charity, social gatherings',
-          icon: 'fas fa-users', 
-          color: '#6f42c1',
-          is_active: true,
-          created_at: new Date().toISOString()
-        }
-      ];
-      setCategories(simplifiedCategories);
+      // Fetch from real API
+      const response = await categoriesAPI.getAll({ limit: 100 });
+      const fetchedCategories = response?.data?.categories || response?.categories || [];
+      
+      console.log('Categories from database:', fetchedCategories);
+      setCategories(fetchedCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      toast.error('Failed to load categories');
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -90,11 +45,26 @@ const CategoriesManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Categories are now fixed - show message that editing is disabled
-    alert('Categories are now fixed to 6 main types: Technology, Business, Education, Entertainment, Sports, Community. Editing is disabled.');
-    setShowModal(false);
-    setEditingCategory(null);
-    resetForm();
+    
+    try {
+      if (editingCategory) {
+        // Update existing category
+        await categoriesAPI.update(editingCategory.id, formData);
+        toast.success('Category berhasil diupdate!');
+      } else {
+        // Create new category
+        await categoriesAPI.create(formData);
+        toast.success('Category berhasil ditambahkan!');
+      }
+      
+      setShowModal(false);
+      setEditingCategory(null);
+      resetForm();
+      fetchCategories();
+    } catch (error) {
+      console.error('Error saving category:', error);
+      toast.error(error.response?.data?.message || 'Gagal menyimpan category');
+    }
   };
 
   const handleEdit = (category) => {
@@ -109,15 +79,20 @@ const CategoriesManagement = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
-      try {
-        await categoriesAPI.delete(id);
-        fetchCategories();
-      } catch (error) {
-        console.error('Error deleting category:', error);
-        alert('Error deleting category. Please try again.');
-      }
+  const handleDelete = (id) => {
+    setDeleteConfirm({ show: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await categoriesAPI.delete(deleteConfirm.id);
+      toast.success('Category berhasil dihapus!');
+      setDeleteConfirm({ show: false, id: null });
+      fetchCategories();
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast.error(error.response?.data?.message || 'Gagal menghapus category');
+      setDeleteConfirm({ show: false, id: null });
     }
   };
 
@@ -154,7 +129,10 @@ const CategoriesManagement = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-black mb-2">📂 Categories Management</h1>
+          <h1 className="text-3xl font-bold text-black mb-2 flex items-center gap-2">
+            <FolderKanban className="w-8 h-8 text-blue-600" />
+            Categories Management
+          </h1>
           <p className="text-gray-600">Organize events into categories</p>
         </div>
         <button
@@ -204,7 +182,7 @@ const CategoriesManagement = () => {
                     {category.icon ? (
                       <i className={category.icon} style={{ color: category.color }}></i>
                     ) : (
-                      <span style={{ color: category.color }}>📂</span>
+                      <FolderKanban className="w-6 h-6" style={{ color: category.color }} />
                     )}
                   </div>
                   <div className="ml-4">
@@ -254,7 +232,9 @@ const CategoriesManagement = () => {
 
       {filteredCategories.length === 0 && !loading && (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">📂</div>
+          <div className="mb-4">
+            <FolderKanban className="w-20 h-20 mx-auto text-gray-400" />
+          </div>
           <h3 className="text-xl font-semibold text-black mb-2">No categories found</h3>
           <p className="text-gray-600">
             {searchTerm ? 'Try adjusting your search terms' : 'Create your first category to get started'}
@@ -358,6 +338,18 @@ const CategoriesManagement = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ show: false, id: null })}
+        onConfirm={confirmDelete}
+        title="Konfirmasi Hapus Category"
+        message="Apakah Anda yakin ingin menghapus category ini?"
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        type="danger"
+      />
     </div>
   );
 };

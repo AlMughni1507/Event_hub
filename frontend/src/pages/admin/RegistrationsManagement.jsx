@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmModal from '../../components/ConfirmModal';
+import { ClipboardList, FileText, Search, Filter, CheckCircle, XCircle, Clock, Award } from 'lucide-react';
 import { registrationsAPI, eventsAPI, certificatesAPI } from '../../services/api';
 
 const RegistrationsManagement = () => {
+  const toast = useToast();
   const [registrations, setRegistrations] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null });
+  const [generateConfirm, setGenerateConfirm] = useState({ show: false, registration: null });
+  const [bulkGenerateConfirm, setBulkGenerateConfirm] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     event_id: '',
@@ -65,69 +72,81 @@ const RegistrationsManagement = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      toast.success('Data peserta berhasil diekspor!');
     } catch (error) {
       console.error('Error exporting participants:', error);
-      alert('Gagal mengekspor data peserta');
+      toast.error('Gagal mengekspor data peserta');
     }
   };
 
   const handleStatusUpdate = async (registrationId, newStatus) => {
     try {
       await registrationsAPI.update(registrationId, { status: newStatus });
+      toast.success('Status registrasi berhasil diupdate!');
       fetchRegistrations();
     } catch (error) {
       console.error('Error updating registration status:', error);
-      alert('Error updating registration status. Please try again.');
+      toast.error('Error updating registration status. Please try again.');
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this registration?')) {
-      try {
-        await registrationsAPI.delete(id);
-        fetchRegistrations();
-      } catch (error) {
-        console.error('Error deleting registration:', error);
-        alert('Error deleting registration. Please try again.');
-      }
+  const handleDelete = (id) => {
+    setDeleteConfirm({ show: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await registrationsAPI.delete(deleteConfirm.id);
+      toast.success('Registration berhasil dihapus!');
+      fetchRegistrations();
+    } catch (error) {
+      console.error('Error deleting registration:', error);
+      toast.error('Error deleting registration. Please try again.');
     }
   };
 
-  const handleGenerateCertificate = async (registration) => {
+  const handleGenerateCertificate = (registration) => {
+    setGenerateConfirm({ show: true, registration });
+  };
+
+  const confirmGenerateCertificate = async () => {
+    const registration = generateConfirm.registration;
     try {
       await certificatesAPI.generate(registration.event_id, registration.id);
-      alert(`Certificate generated for ${registration.full_name || registration.user_name}`);
+      toast.success(`Certificate generated for ${registration.full_name || registration.user_name}`);
     } catch (error) {
       console.error('Error generating certificate:', error);
-      alert('Failed to generate certificate. Please try again.');
+      toast.error('Failed to generate certificate. Please try again.');
     }
   };
 
-  const handleBulkGenerateCertificates = async () => {
+  const handleBulkGenerateCertificates = () => {
     const approvedRegistrations = registrations.filter(r => r.status === 'approved');
     if (approvedRegistrations.length === 0) {
-      alert('No approved registrations found to generate certificates.');
+      toast.warning('No approved registrations found to generate certificates.');
       return;
     }
+    setBulkGenerateConfirm(true);
+  };
 
-    if (window.confirm(`Generate certificates for ${approvedRegistrations.length} approved participants?`)) {
-      try {
-        // Group by event_id for bulk generation
-        const eventGroups = approvedRegistrations.reduce((groups, reg) => {
-          if (!groups[reg.event_id]) groups[reg.event_id] = [];
-          groups[reg.event_id].push(reg);
-          return groups;
-        }, {});
+  const confirmBulkGenerate = async () => {
+    const approvedRegistrations = registrations.filter(r => r.status === 'approved');
+    try {
+      // Group by event_id for bulk generation
+      const eventGroups = approvedRegistrations.reduce((groups, reg) => {
+        if (!groups[reg.event_id]) groups[reg.event_id] = [];
+        groups[reg.event_id].push(reg);
+        return groups;
+      }, {});
 
-        for (const eventId of Object.keys(eventGroups)) {
-          await certificatesAPI.generateBulk(eventId);
-        }
-        
-        alert(`Successfully generated certificates for ${approvedRegistrations.length} participants!`);
-      } catch (error) {
-        console.error('Error generating bulk certificates:', error);
-        alert('Failed to generate certificates. Please try again.');
+      for (const eventId of Object.keys(eventGroups)) {
+        await certificatesAPI.generateBulk(eventId);
       }
+      
+      toast.success(`Successfully generated certificates for ${approvedRegistrations.length} participants!`);
+    } catch (error) {
+      console.error('Error generating bulk certificates:', error);
+      toast.error('Failed to generate certificates. Please try again.');
     }
   };
 
@@ -161,7 +180,10 @@ const RegistrationsManagement = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-black mb-2">📝 Registrations Management</h1>
+          <h1 className="text-3xl font-bold text-black mb-2 flex items-center gap-2">
+            <ClipboardList className="w-8 h-8 text-blue-600" />
+            Registrations Management
+          </h1>
           <p className="text-gray-600">Monitor and manage event registrations</p>
         </div>
         <div className="mt-4 md:mt-0 flex space-x-4">
@@ -380,7 +402,9 @@ const RegistrationsManagement = () => {
 
       {registrations.length === 0 && !loading && (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">📝</div>
+          <div className="mb-4">
+            <ClipboardList className="w-20 h-20 mx-auto text-gray-400" />
+          </div>
           <h3 className="text-xl font-semibold text-black mb-2">No registrations found</h3>
           <p className="text-gray-600">
             {filters.search || filters.event_id || filters.status ? 
@@ -440,6 +464,42 @@ const RegistrationsManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ show: false, id: null })}
+        onConfirm={confirmDelete}
+        title="Konfirmasi Hapus Registration"
+        message="Apakah Anda yakin ingin menghapus registration ini?"
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        type="danger"
+      />
+
+      {/* Generate Certificate Confirmation Modal */}
+      <ConfirmModal
+        isOpen={generateConfirm.show}
+        onClose={() => setGenerateConfirm({ show: false, registration: null })}
+        onConfirm={confirmGenerateCertificate}
+        title="Generate Certificate"
+        message={`Generate certificate untuk ${generateConfirm.registration?.full_name || generateConfirm.registration?.user_name}?`}
+        confirmText="Ya, Generate"
+        cancelText="Batal"
+        type="info"
+      />
+
+      {/* Bulk Generate Certificates Confirmation Modal */}
+      <ConfirmModal
+        isOpen={bulkGenerateConfirm}
+        onClose={() => setBulkGenerateConfirm(false)}
+        onConfirm={confirmBulkGenerate}
+        title="Bulk Generate Certificates"
+        message={`Generate certificates untuk ${registrations.filter(r => r.status === 'approved').length} approved registrations?`}
+        confirmText="Ya, Generate All"
+        cancelText="Batal"
+        type="warning"
+      />
     </div>
   );
 };

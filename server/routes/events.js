@@ -163,20 +163,19 @@ router.get('/:id', async (req, res) => {
 // Create event (admin only)
 router.post('/', authenticateToken, requireUser, upload.single('image'), async (req, res) => {
   try {
-    const { title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, max_participants, price, is_free, status } = req.body;
+    const { title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, max_participants, price, is_free, has_certificate, status, image_aspect_ratio } = req.body;
 
     // Validate required fields
     if (!title || !description || !event_date || !event_time || !location || !category_id) {
       return ApiResponse.badRequest(res, 'Missing required fields');
     }
 
-    // Check if admin can create event (max H-3 from event date)
+    // Validate event date is not in the past
     const eventDate = new Date(event_date);
-    const today = new Date();
-    const threeDaysFromNow = new Date(today.getTime() + (3 * 24 * 60 * 60 * 1000));
+    const now = new Date();
     
-    if (eventDate < threeDaysFromNow) {
-      return ApiResponse.badRequest(res, 'Admin hanya dapat membuat event maksimal H-3 dari tanggal penyelenggaraan');
+    if (eventDate < now) {
+      return ApiResponse.badRequest(res, 'Event date cannot be in the past');
     }
 
     // Check if category exists
@@ -188,11 +187,33 @@ router.post('/', authenticateToken, requireUser, upload.single('image'), async (
     // Get image path if uploaded
     const imagePath = req.file ? `/uploads/events/${req.file.filename}` : null;
 
-    // Create event
+    // Create event - convert undefined to null for SQL compatibility
     const [result] = await query(
-      `INSERT INTO events (title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, organizer_id, max_participants, price, is_free, image, banner, status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [title, description, short_description || description.substring(0, 200), event_date, event_time, end_date || event_date, end_time || event_time, location, address || location, city || 'Jakarta', province || 'DKI Jakarta', category_id, req.user.id, max_participants || 50, price || 0, is_free === 'true' || is_free === true || price == 0, imagePath, null, status || 'published']
+      `INSERT INTO events (title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, organizer_id, max_participants, price, is_free, has_certificate, image, image_aspect_ratio, banner, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        title, 
+        description, 
+        short_description || description.substring(0, 200), 
+        event_date, 
+        event_time, 
+        end_date || event_date, 
+        end_time || event_time, 
+        location, 
+        address ?? location,  // Use nullish coalescing to handle undefined
+        city ?? 'Jakarta', 
+        province ?? 'DKI Jakarta', 
+        category_id, 
+        req.user.id, 
+        max_participants || 50, 
+        price || 0, 
+        is_free === 'true' || is_free === true || price == 0, 
+        has_certificate === 'true' || has_certificate === true, 
+        imagePath, 
+        image_aspect_ratio || '16:9', 
+        null, 
+        status || 'published'
+      ]
     );
 
     // Get created event
@@ -218,32 +239,135 @@ router.post('/', authenticateToken, requireUser, upload.single('image'), async (
   }
 });
 
-// Update event (admin only)
-router.put('/:id', authenticateToken, requireUser, validateEvent, handleValidationErrors, async (req, res) => {
+// Update event (admin only) - SIMPLIFIED VERSION
+router.put('/:id', authenticateToken, requireUser, upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, max_participants, price, is_free, image_url, banner, status, is_active } = req.body;
+    
+    console.log('=== UPDATE EVENT START ===');
+    console.log('Event ID:', id);
+    console.log('Request Body:', req.body);
+    console.log('File uploaded:', req.file ? req.file.filename : 'No file');
 
     // Check if event exists
-    const [existingEvents] = await query('SELECT id FROM events WHERE id = ?', [id]);
+    const [existingEvents] = await query('SELECT * FROM events WHERE id = ?', [id]);
     if (existingEvents.length === 0) {
+      console.log('ERROR: Event not found');
       return ApiResponse.notFound(res, 'Event not found');
     }
 
-    // Check if category exists
-    const [categories] = await query('SELECT id FROM categories WHERE id = ?', [category_id]);
-    if (categories.length === 0) {
-      return ApiResponse.badRequest(res, 'Category not found');
-    }
+    const existingEvent = existingEvents[0];
+    console.log('Existing event found:', existingEvent.title);
 
-    // Update event
-    await query(
-      `UPDATE events 
-       SET title = ?, description = ?, short_description = ?, event_date = ?, event_time = ?, end_date = ?, end_time = ?, location = ?, address = ?, city = ?, province = ?, category_id = ?, 
-           max_participants = ?, price = ?, is_free = ?, image = ?, banner = ?, status = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?`,
-      [title, description, short_description, event_date, event_time, end_date, end_time, location, address, city, province, category_id, max_participants, price || 0, is_free || false, image_url, banner, status, is_active, id]
-    );
+    // Extract and validate only what's provided
+    const title = req.body.title || existingEvent.title;
+    const description = req.body.description || existingEvent.description;
+    const category_id = req.body.category_id || existingEvent.category_id;
+    const event_date = req.body.event_date || existingEvent.event_date;
+    const event_time = req.body.event_time || existingEvent.event_time;
+    const location = req.body.location || existingEvent.location;
+
+    console.log('Validated required fields:', { title, description, category_id, event_date, event_time, location });
+
+    // Get new image path if uploaded, otherwise keep existing
+    const imagePath = req.file 
+      ? `/uploads/events/${req.file.filename}` 
+      : existingEvent.image;
+
+    // Build update data with fallbacks to existing values
+    const updateData = {
+      title,
+      description,
+      short_description: req.body.short_description || existingEvent.short_description || description.substring(0, 200),
+      event_date,
+      event_time,
+      end_date: req.body.end_date || event_date,
+      end_time: req.body.end_time || event_time,
+      location,
+      address: req.body.address || existingEvent.address || location,
+      city: req.body.city || existingEvent.city || 'Jakarta',
+      province: req.body.province || existingEvent.province || 'DKI Jakarta',
+      category_id: parseInt(category_id),
+      max_participants: parseInt(req.body.max_participants || existingEvent.max_participants || 50),
+      price: parseFloat(req.body.price || existingEvent.price || 0),
+      is_free: (req.body.is_free === 'true' || req.body.is_free === true || req.body.is_free === 1) ? 1 : 0,
+      image: imagePath,
+      image_aspect_ratio: req.body.image_aspect_ratio || existingEvent.image_aspect_ratio || '16:9',
+      // IMPORTANT: Keep existing status if not explicitly provided
+      status: req.body.status || existingEvent.status || 'published',
+      // IMPORTANT: Keep existing is_active if not explicitly provided (prevent auto-deactivation!)
+      is_active: req.body.is_active !== undefined 
+        ? ((req.body.is_active === 'true' || req.body.is_active === true || req.body.is_active === 1) ? 1 : 0)
+        : existingEvent.is_active  // FALLBACK to existing value if undefined
+    };
+
+    console.log('Final update data:', updateData);
+
+    // Simple update query
+    try {
+      const updateQuery = `
+        UPDATE events 
+        SET 
+          title = ?, 
+          description = ?, 
+          short_description = ?, 
+          event_date = ?, 
+          event_time = ?, 
+          end_date = ?, 
+          end_time = ?, 
+          location = ?, 
+          address = ?, 
+          city = ?, 
+          province = ?, 
+          category_id = ?, 
+          max_participants = ?, 
+          price = ?, 
+          is_free = ?, 
+          image = ?, 
+          image_aspect_ratio = ?, 
+          status = ?, 
+          is_active = ?, 
+          updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?`;
+      
+      const updateParams = [
+        updateData.title,
+        updateData.description,
+        updateData.short_description,
+        updateData.event_date,
+        updateData.event_time,
+        updateData.end_date,
+        updateData.end_time,
+        updateData.location,
+        updateData.address,
+        updateData.city,
+        updateData.province,
+        updateData.category_id,
+        updateData.max_participants,
+        updateData.price,
+        updateData.is_free,
+        updateData.image,
+        updateData.image_aspect_ratio,
+        updateData.status,
+        updateData.is_active,
+        parseInt(id)
+      ];
+      
+      console.log('Executing update with params:', updateParams);
+      const [result] = await query(updateQuery, updateParams);
+      console.log('✅ Update successful! Rows affected:', result.affectedRows);
+      
+      if (result.affectedRows === 0) {
+        throw new Error('No rows were affected by the update');
+      }
+    } catch (queryError) {
+      console.error('❌ Database query error:', {
+        message: queryError.message,
+        code: queryError.code,
+        sqlMessage: queryError.sqlMessage
+      });
+      return ApiResponse.error(res, `Database error: ${queryError.sqlMessage || queryError.message}`);
+    }
 
     // Get updated event
     const [events] = await query(
@@ -254,11 +378,26 @@ router.put('/:id', authenticateToken, requireUser, validateEvent, handleValidati
       [id]
     );
 
-    return ApiResponse.success(res, events[0], 'Event updated successfully');
+    console.log('=== UPDATE EVENT SUCCESS ===');
+    return ApiResponse.success(res, events[0], 'Event berhasil diupdate!');
 
   } catch (error) {
-    console.error('Update event error:', error);
-    return ApiResponse.error(res, 'Failed to update event');
+    console.error('❌ Update event error:', {
+      message: error.message,
+      stack: error.stack
+    });
+    
+    // Detailed error message
+    let errorMsg = 'Gagal update event';
+    if (error.message.includes('Duplicate')) {
+      errorMsg = 'Data duplikat ditemukan';
+    } else if (error.message.includes('foreign key')) {
+      errorMsg = 'Category tidak valid';
+    } else if (error.message) {
+      errorMsg = error.message;
+    }
+    
+    return ApiResponse.error(res, errorMsg);
   }
 });
 

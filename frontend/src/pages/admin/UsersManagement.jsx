@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmModal from '../../components/ConfirmModal';
+import { Users, UserPlus, Edit, Trash2, Search, Shield, User } from 'lucide-react';
 import { usersAPI } from '../../services/api';
 
 const UsersManagement = () => {
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null });
   const [filters, setFilters] = useState({
     search: '',
     role: '',
@@ -57,10 +62,11 @@ const UsersManagement = () => {
       setShowModal(false);
       setEditingUser(null);
       resetForm();
+      toast.success(editingUser ? 'User berhasil diupdate!' : 'User berhasil dibuat!');
       fetchUsers();
     } catch (error) {
       console.error('Error saving user:', error);
-      alert('Error saving user. Please try again.');
+      toast.error('Error saving user. Please try again.');
     }
   };
 
@@ -77,15 +83,18 @@ const UsersManagement = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      try {
-        await usersAPI.delete(id);
-        fetchUsers();
-      } catch (error) {
-        console.error('Error deleting user:', error);
-        alert('Error deleting user. Please try again.');
-      }
+  const handleDelete = (id) => {
+    setDeleteConfirm({ show: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await usersAPI.delete(deleteConfirm.id);
+      toast.success('User berhasil dihapus!');
+      fetchUsers();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Error deleting user. Please try again.');
     }
   };
 
@@ -121,7 +130,10 @@ const UsersManagement = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-black mb-2">👥 Users Management</h1>
+          <h1 className="text-3xl font-bold text-black mb-2 flex items-center gap-2">
+            <Users className="w-8 h-8 text-blue-600" />
+            Users Management
+          </h1>
           <p className="text-gray-600">Manage community members</p>
         </div>
         <button
@@ -272,7 +284,9 @@ const UsersManagement = () => {
 
       {filteredUsers.length === 0 && !loading && (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">👥</div>
+          <div className="mb-4">
+            <Users className="w-20 h-20 mx-auto text-gray-400" />
+          </div>
           <h3 className="text-xl font-semibold text-black mb-2">No users found</h3>
           <p className="text-gray-600">Try adjusting your search filters</p>
         </div>
@@ -393,6 +407,18 @@ const UsersManagement = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ show: false, id: null })}
+        onConfirm={confirmDelete}
+        title="Konfirmasi Hapus User"
+        message="Apakah Anda yakin ingin menghapus user ini?"
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        type="danger"
+      />
     </div>
   );
 };

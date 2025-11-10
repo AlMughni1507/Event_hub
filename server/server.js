@@ -6,6 +6,7 @@ const path = require('path');
 require('dotenv').config({ path: './config.env' });
 const { initCronJobs } = require('./utils/cronJobs');
 const { archiveEndedEvents } = require('./utils/eventCleanup');
+const { runMigrations } = require('./migrations/runMigration');
 
 const app = express();
 
@@ -23,10 +24,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Rate limiting
+// Rate limiting - more generous for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 500, // limit each IP to 500 requests per windowMs (increased for development)
+  message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
 
@@ -34,8 +36,13 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve uploaded files statically with CORS headers
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -63,6 +70,8 @@ const uploadRoutes = require('./routes/upload');
 const paymentRoutes = require('./routes/payments');
 const attendanceRoutes = require('./routes/attendance');
 const certificateRoutes = require('./routes/certificates');
+const performersRoutes = require('./routes/performers');
+const reviewsRoutes = require('./routes/reviews');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -80,6 +89,8 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/certificates', certificateRoutes);
+app.use('/api/performers', performersRoutes);
+app.use('/api/reviews', reviewsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -106,7 +117,15 @@ app.listen(PORT, async () => {
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   
-  console.log('✅ All routes registered successfully');
+  console.log('✅ All routes registered successfully\n');
+  
+  // Run database migrations first
+  console.log('🔄 Running database migrations...');
+  try {
+    await runMigrations();
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
+  }
   
   // Run initial cleanup on server start
   console.log('🧹 Running initial event archival...');

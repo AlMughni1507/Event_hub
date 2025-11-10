@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext';
+import { Save, ArrowLeft, Calendar, MapPin, Users, DollarSign, Image as ImageIcon } from 'lucide-react';
 import api from '../../services/api';
 
 const EditEvent = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -13,7 +16,9 @@ const EditEvent = () => {
     description: '',
     short_description: '',
     event_date: '',
+    event_time: '',
     end_date: '',
+    end_time: '',
     location: '',
     is_online: false,
     address: '',
@@ -21,21 +26,27 @@ const EditEvent = () => {
     province: '',
     category_id: '',
     max_participants: '50',
-    registration_fee: '0',
+    price: '0', // FIX: Changed from registration_fee to price
     registration_deadline: '',
     status: 'published',
     tags: '',
     is_free: false,
+    is_active: true,
     unlimited_participants: false,
-    image: null
+    image: null,
+    image_aspect_ratio: '16:9'
   });
   const [imagePreview, setImagePreview] = useState(null);
   const [currentImage, setCurrentImage] = useState(null);
   const [errors, setErrors] = useState({});
+  const [performers, setPerformers] = useState([]);
+  const [performerInputs, setPerformerInputs] = useState([{ id: null, name: '', photo: null, photoPreview: null, existingPhotoUrl: null }]);
+  const [deletedPerformerIds, setDeletedPerformerIds] = useState([]);
 
   useEffect(() => {
     fetchEvent();
     fetchCategories();
+    fetchPerformers();
   }, [id]);
 
   const fetchEvent = async () => {
@@ -51,33 +62,50 @@ const EditEvent = () => {
         throw new Error('Event not found');
       }
       
-      // Format dates for input fields
-      const formatDateForInput = (dateString) => {
+      // Format dates for input fields (date + time combined)
+      const formatDateTimeForInput = (dateString, timeString) => {
         if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+        try {
+          // If timeString is provided, combine date and time
+          if (timeString) {
+            const date = dateString.split('T')[0]; // Get date part
+            return `${date}T${timeString}`;
+          }
+          // Otherwise use the full datetime
+          const date = new Date(dateString);
+          return date.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+        } catch (e) {
+          console.error('Date format error:', e);
+          return '';
+        }
       };
+
+      console.log('Event data from API:', event);
 
       setFormData({
         title: event.title || '',
         description: event.description || '',
         short_description: event.short_description || '',
-        event_date: formatDateForInput(event.event_date),
-        end_date: formatDateForInput(event.end_date),
+        event_date: formatDateTimeForInput(event.event_date, event.event_time),
+        event_time: event.event_time || '',
+        end_date: formatDateTimeForInput(event.end_date, event.end_time),
+        end_time: event.end_time || '',
         location: event.location || '',
         is_online: event.is_online || false,
         address: event.address || '',
         city: event.city || '',
         province: event.province || '',
         category_id: event.category_id || '',
-        max_participants: event.max_participants || '50',
-        registration_fee: event.registration_fee || '0',
-        registration_deadline: formatDateForInput(event.registration_deadline),
+        max_participants: event.max_participants?.toString() || '50',
+        price: event.price?.toString() || '0', // FIX: Use 'price' not 'registration_fee'
+        registration_deadline: formatDateTimeForInput(event.registration_deadline),
         status: event.status || 'published',
         tags: event.tags || '',
-        is_free: event.is_free || false,
+        is_free: event.is_free || event.price === 0 || false,
         unlimited_participants: event.unlimited_participants || false,
-        image: null
+        is_active: event.is_active !== undefined ? event.is_active : true,
+        image: null,
+        image_aspect_ratio: event.image_aspect_ratio || '16:9'
       });
 
       if (event.image_url) {
@@ -86,7 +114,7 @@ const EditEvent = () => {
     } catch (error) {
       console.error('Error fetching event:', error);
       console.error('Error details:', error.response?.data);
-      alert(`Gagal memuat data event: ${error.response?.data?.message || error.message}`);
+      toast.error(`Gagal memuat data event: ${error.response?.data?.message || error.message}`);
       navigate('/admin/events');
     } finally {
       setLoading(false);
@@ -114,11 +142,11 @@ const EditEvent = () => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Ukuran file terlalu besar! Maksimal 5MB');
+        toast.error('Ukuran file terlalu besar! Maksimal 5MB');
         return;
       }
       if (!file.type.startsWith('image/')) {
-        alert('File harus berupa gambar!');
+        toast.error('File harus berupa gambar!');
         return;
       }
       setFormData(prev => ({ ...prev, image: file }));
@@ -136,36 +164,199 @@ const EditEvent = () => {
     setImagePreview(null);
   };
 
+  const fetchPerformers = async () => {
+    try {
+      const response = await api.get(`/performers/event/${id}`);
+      const fetchedPerformers = response.data.performers || [];
+      setPerformers(fetchedPerformers);
+      
+      if (fetchedPerformers.length > 0) {
+        setPerformerInputs(fetchedPerformers.map(p => ({
+          id: p.id,
+          name: p.name,
+          photo: null,
+          photoPreview: null,
+          existingPhotoUrl: p.photo_url
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching performers:', error);
+    }
+  };
+
+  const addPerformerInput = () => {
+    setPerformerInputs([...performerInputs, { id: null, name: '', photo: null, photoPreview: null, existingPhotoUrl: null }]);
+  };
+
+  const removePerformerInput = (index) => {
+    const performer = performerInputs[index];
+    if (performer.id) {
+      setDeletedPerformerIds([...deletedPerformerIds, performer.id]);
+    }
+    const newInputs = performerInputs.filter((_, i) => i !== index);
+    setPerformerInputs(newInputs.length > 0 ? newInputs : [{ id: null, name: '', photo: null, photoPreview: null, existingPhotoUrl: null }]);
+  };
+
+  const handlePerformerNameChange = (index, name) => {
+    const newInputs = [...performerInputs];
+    newInputs[index].name = name;
+    setPerformerInputs(newInputs);
+  };
+
+  const handlePerformerPhotoChange = (index, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Ukuran file terlalu besar! Maksimal 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error('File harus berupa gambar!');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newInputs = [...performerInputs];
+        newInputs[index].photo = file;
+        newInputs[index].photoPreview = reader.result;
+        setPerformerInputs(newInputs);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePerformerPhoto = (index) => {
+    const newInputs = [...performerInputs];
+    newInputs[index].photo = null;
+    newInputs[index].photoPreview = null;
+    setPerformerInputs(newInputs);
+  };
+
   const handleUpdateEvent = async (e) => {
     e.preventDefault();
     setSaving(true);
     setErrors({});
 
     try {
+      console.log('=== FRONTEND: Starting update ===');
+      console.log('Form data:', formData);
+
       const submitData = new FormData();
       
-      Object.keys(formData).forEach(key => {
-        if (key === 'image' && formData[key]) {
-          submitData.append('image', formData[key]);
-        } else if (formData[key] !== null && formData[key] !== '') {
-          submitData.append(key, formData[key]);
+      // Split datetime-local into date and time
+      const extractDateTime = (datetimeLocal) => {
+        if (!datetimeLocal) return { date: '', time: '00:00' };
+        const parts = datetimeLocal.split('T');
+        return { date: parts[0] || '', time: parts[1] || '00:00' };
+      };
+
+      const eventDT = extractDateTime(formData.event_date);
+      const endDT = extractDateTime(formData.end_date);
+
+      // Only send fields that have values
+      const fieldsToSend = {
+        title: formData.title,
+        description: formData.description,
+        short_description: formData.short_description || '',
+        event_date: eventDT.date,
+        event_time: eventDT.time,
+        end_date: endDT.date || eventDT.date,
+        end_time: endDT.time || eventDT.time,
+        location: formData.location,
+        address: formData.address || '',
+        city: formData.city || '',
+        province: formData.province || '',
+        category_id: formData.category_id,
+        max_participants: formData.max_participants || '50',
+        price: formData.price || '0',
+        is_free: formData.is_free ? '1' : '0',
+        is_active: formData.is_active ? '1' : '0',
+        status: formData.status || 'published',
+        image_aspect_ratio: formData.image_aspect_ratio || '16:9'
+      };
+
+      console.log('Fields to send:', fieldsToSend);
+
+      // Add all fields to FormData
+      Object.entries(fieldsToSend).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          submitData.append(key, value);
         }
       });
 
-      await api.put(`/events/${id}`, submitData, {
+      // Add image if uploaded
+      if (formData.image) {
+        submitData.append('image', formData.image);
+        console.log('Image file added:', formData.image.name);
+      }
+
+      console.log('FormData entries:', Array.from(submitData.entries()));
+
+      console.log('Sending PUT request to:', `/events/${id}`);
+      const response = await api.put(`/events/${id}`, submitData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      alert('✅ Event berhasil diupdate!');
-      navigate('/admin/events');
+      console.log('✅ Update response:', response.data);
+
+      // Delete removed performers
+      for (const performerId of deletedPerformerIds) {
+        try {
+          await api.delete(`/performers/${performerId}`);
+        } catch (err) {
+          console.error('Error deleting performer:', err);
+        }
+      }
+
+      // Update/Create performers
+      const validPerformers = performerInputs.filter(p => p.name.trim() !== '');
+      for (let i = 0; i < validPerformers.length; i++) {
+        const performer = validPerformers[i];
+        const performerData = new FormData();
+        performerData.append('name', performer.name);
+        performerData.append('display_order', i);
+        
+        if (performer.photo) {
+          performerData.append('photo', performer.photo);
+        }
+        
+        try {
+          if (performer.id) {
+            await api.put(`/performers/${performer.id}`, performerData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+            });
+          } else {
+            performerData.append('event_id', id);
+            await api.post('/performers', performerData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+            });
+          }
+        } catch (err) {
+          console.error('Error saving performer:', err);
+        }
+      }
+
+      console.log('=== UPDATE COMPLETE ===');
+      toast.success('✅ Event berhasil diupdate!');
+      
+      // Navigate after small delay to show toast
+      setTimeout(() => {
+        navigate('/admin/events');
+      }, 500);
+      
     } catch (error) {
-      console.error('Error updating event:', error);
+      console.error('❌ Error updating event:', error);
+      console.error('Error response:', error.response?.data);
+      
       if (error.response?.data?.errors) {
         setErrors(error.response.data.errors);
       }
-      alert('❌ Gagal update event: ' + (error.response?.data?.message || error.message));
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      toast.error('❌ Gagal update: ' + errorMessage);
     } finally {
       setSaving(false);
     }
@@ -300,6 +491,74 @@ const EditEvent = () => {
             <p className="text-xs text-gray-500 mt-1">
               {imagePreview ? 'Foto baru akan mengganti foto lama' : 'Upload foto baru jika ingin mengubah (Maksimal 5MB)'}
             </p>
+            
+            {/* Aspect Ratio Selector */}
+            <div className="mt-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Aspect Ratio Foto Card
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, image_aspect_ratio: '9:16' }))}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    formData.image_aspect_ratio === '9:16'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`w-12 h-20 rounded border-2 ${
+                      formData.image_aspect_ratio === '9:16' ? 'border-purple-500 bg-purple-100' : 'border-gray-300 bg-gray-100'
+                    }`}></div>
+                    <span className={`text-sm font-medium ${
+                      formData.image_aspect_ratio === '9:16' ? 'text-purple-600' : 'text-gray-700'
+                    }`}>9:16 Portrait</span>
+                  </div>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, image_aspect_ratio: '1:1' }))}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    formData.image_aspect_ratio === '1:1'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`w-16 h-16 rounded border-2 ${
+                      formData.image_aspect_ratio === '1:1' ? 'border-purple-500 bg-purple-100' : 'border-gray-300 bg-gray-100'
+                    }`}></div>
+                    <span className={`text-sm font-medium ${
+                      formData.image_aspect_ratio === '1:1' ? 'text-purple-600' : 'text-gray-700'
+                    }`}>1:1 Square</span>
+                  </div>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, image_aspect_ratio: '16:9' }))}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    formData.image_aspect_ratio === '16:9'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`w-20 h-12 rounded border-2 ${
+                      formData.image_aspect_ratio === '16:9' ? 'border-purple-500 bg-purple-100' : 'border-gray-300 bg-gray-100'
+                    }`}></div>
+                    <span className={`text-sm font-medium ${
+                      formData.image_aspect_ratio === '16:9' ? 'text-purple-600' : 'text-gray-700'
+                    }`}>16:9 Landscape</span>
+                  </div>
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Pilih aspect ratio yang sesuai dengan desain foto event Anda
+              </p>
+            </div>
           </div>
 
           {/* Tanggal & Waktu */}
@@ -420,8 +679,8 @@ const EditEvent = () => {
             {!formData.is_free && (
               <input
                 type="number"
-                name="registration_fee"
-                value={formData.registration_fee}
+                name="price"
+                value={formData.price}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 placeholder="Biaya pendaftaran (Rp)"
@@ -442,6 +701,127 @@ const EditEvent = () => {
               onChange={handleInputChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
             />
+          </div>
+
+          {/* Line-ups / Performers Section */}
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <span>🎤</span> Line-ups / Performers
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">Kelola performer atau pembicara untuk event ini</p>
+              </div>
+              <button
+                type="button"
+                onClick={addPerformerInput}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-lg font-medium shadow-sm hover:shadow-md transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Tambah Performer
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {performerInputs.map((performer, index) => (
+                <div key={index} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-4">
+                    {/* Photo Preview/Upload */}
+                    <div className="flex-shrink-0">
+                      <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-300 bg-white">
+                        {performer.photoPreview ? (
+                          <div className="relative w-full h-full">
+                            <img 
+                              src={performer.photoPreview} 
+                              alt="Performer preview" 
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePerformerPhoto(index)}
+                              className="absolute top-0.5 right-0.5 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full transition-colors"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : performer.existingPhotoUrl ? (
+                          <div className="relative w-full h-full">
+                            <img 
+                              src={`http://localhost:3000${performer.existingPhotoUrl}`} 
+                              alt="Current performer" 
+                              className="w-full h-full object-cover"
+                            />
+                            <label className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
+                              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => handlePerformerPhotoChange(index, e)}
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                            <svg className="w-6 h-6 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-xs text-gray-500 text-center px-1">Upload</span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="image/*"
+                              onChange={(e) => handlePerformerPhotoChange(index, e)}
+                            />
+                          </label>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1 text-center">Max 5MB</p>
+                    </div>
+
+                    {/* Name Input */}
+                    <div className="flex-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Nama Performer {index + 1} {performer.id && <span className="text-xs text-blue-600">(Existing)</span>}
+                      </label>
+                      <input
+                        type="text"
+                        value={performer.name}
+                        onChange={(e) => handlePerformerNameChange(index, e.target.value)}
+                        className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="Nama performer atau pembicara"
+                      />
+                    </div>
+
+                    {/* Remove Button */}
+                    {performerInputs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removePerformerInput(index)}
+                        className="flex-shrink-0 mt-7 p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-colors"
+                        title="Hapus performer"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {performerInputs.length === 0 && (
+              <div className="text-center py-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <p className="text-gray-500">Belum ada performer. Klik "Tambah Performer" untuk menambahkan.</p>
+              </div>
+            )}
           </div>
 
           {/* Status */}

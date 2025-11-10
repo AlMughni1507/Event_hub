@@ -1,0 +1,394 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import Footer from '../../components/Footer';
+import { Star, Send, ArrowLeft, Sparkles, TrendingUp, Award, MessageSquare, Quote } from 'lucide-react';
+import api from '../../services/api';
+
+const ReviewsPage = () => {
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+  const toast = useToast();
+  
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    rating: 5,
+    comment: '',
+    full_name: user?.full_name || ''
+  });
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.warning('Anda harus login terlebih dahulu untuk memberikan ulasan');
+      navigate('/login');
+      return;
+    }
+    fetchReviews();
+  }, [isAuthenticated]);
+
+  const fetchReviews = async () => {
+    try {
+      const response = await api.get('/reviews');
+      setReviews(response.data.reviews || response.data || []);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (formData.comment.trim().length < 10) {
+      toast.error('Ulasan minimal 10 karakter');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post('/reviews', {
+        ...formData,
+        user_id: user.id
+      });
+      
+      toast.success('Ulasan berhasil dikirim! Terima kasih atas feedback Anda');
+      
+      // Reset form
+      setFormData({
+        rating: 5,
+        comment: '',
+        full_name: user?.full_name || ''
+      });
+      
+      // Refresh reviews
+      fetchReviews();
+    } catch (error) {
+      toast.error('Gagal mengirim ulasan. Silakan coba lagi');
+      console.error('Error submitting review:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const renderStars = (rating) => {
+    return (
+      <div className="flex gap-1">
+        {[...Array(5)].map((_, i) => (
+          <Star
+            key={i}
+            className={`w-5 h-5 ${
+              i < rating
+                ? 'fill-yellow-400 text-yellow-400'
+                : 'text-gray-300'
+            }`}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const avgRating = reviews.length > 0
+    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+    : 0;
+
+  const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
+    star,
+    count: reviews.filter(r => r.rating === star).length,
+    percentage: reviews.length > 0 ? (reviews.filter(r => r.rating === star).length / reviews.length) * 100 : 0
+  }));
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+      {/* Header with Animated Background */}
+      <section className="relative bg-gradient-to-br from-purple-600 via-pink-600 to-rose-600 py-20 overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 mb-8 text-white/90 hover:text-white transition-all hover:gap-3 duration-300 group"
+          >
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="font-poppins font-semibold">Kembali ke Home</span>
+          </button>
+          
+          <div className="text-center mb-12">
+            <div className="inline-block mb-4">
+              <span className="bg-white/20 backdrop-blur-sm text-white px-5 py-2 rounded-full text-sm font-bold flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                YOUR VOICE MATTERS
+              </span>
+            </div>
+            <h1 className="font-bebas text-6xl md:text-8xl font-black mb-6 text-white drop-shadow-2xl">
+              SHARE YOUR EXPERIENCE
+            </h1>
+            <p className="font-poppins text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed">
+              Your feedback helps us create better events for everyone. Share your story!
+            </p>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+              <div className="text-center">
+                <Award className="w-10 h-10 text-yellow-300 mx-auto mb-3" />
+                <div className="text-4xl font-bebas font-black text-white mb-1">{avgRating}</div>
+                <p className="text-white/80 font-poppins font-semibold">Average Rating</p>
+              </div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+              <div className="text-center">
+                <MessageSquare className="w-10 h-10 text-blue-300 mx-auto mb-3" />
+                <div className="text-4xl font-bebas font-black text-white mb-1">{reviews.length}</div>
+                <p className="text-white/80 font-poppins font-semibold">Total Reviews</p>
+              </div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+              <div className="text-center">
+                <TrendingUp className="w-10 h-10 text-green-300 mx-auto mb-3" />
+                <div className="text-4xl font-bebas font-black text-white mb-1">98%</div>
+                <p className="text-white/80 font-poppins font-semibold">Satisfaction</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Content */}
+      <section className="py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* Form */}
+            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+              <h2 className="font-bebas text-3xl text-gray-900 mb-6">Tulis Ulasan Anda</h2>
+              
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Name */}
+                <div>
+                  <label className="block font-poppins font-semibold text-gray-700 mb-2">
+                    Nama Lengkap
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-poppins"
+                    required
+                  />
+                </div>
+
+                {/* Rating */}
+                <div>
+                  <label className="block font-poppins font-semibold text-gray-700 mb-2">
+                    Rating
+                  </label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, rating: star })}
+                        className="transition-transform hover:scale-110"
+                      >
+                        <Star
+                          className={`w-10 h-10 ${
+                            star <= formData.rating
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2 font-poppins">
+                    {formData.rating === 5 && '⭐ Luar Biasa!'}
+                    {formData.rating === 4 && '😊 Bagus'}
+                    {formData.rating === 3 && '👍 Cukup Baik'}
+                    {formData.rating === 2 && '😐 Perlu Perbaikan'}
+                    {formData.rating === 1 && '😞 Kurang Memuaskan'}
+                  </p>
+                </div>
+
+                {/* Comment */}
+                <div>
+                  <label className="block font-poppins font-semibold text-gray-700 mb-2">
+                    Ulasan Anda
+                  </label>
+                  <textarea
+                    value={formData.comment}
+                    onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                    rows="6"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-poppins resize-none"
+                    placeholder="Ceritakan pengalaman Anda menggunakan EventHub..."
+                    required
+                    minLength="10"
+                  />
+                  <p className="text-sm text-gray-500 mt-1 font-poppins">
+                    Minimal 10 karakter ({formData.comment.length}/10)
+                  </p>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-poppins font-bold py-4 rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Mengirim...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      <span>Kirim Ulasan</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* Recent Reviews & Rating Distribution */}
+            <div>
+              <div className="mb-8">
+                <h2 className="font-bebas text-3xl text-gray-900 mb-6 flex items-center gap-2">
+                  <MessageSquare className="w-7 h-7 text-purple-600" />
+                  RATING BREAKDOWN
+                </h2>
+                
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-100">
+                  {ratingDistribution.map(({ star, count, percentage }) => (
+                    <div key={star} className="flex items-center gap-4 mb-3 last:mb-0">
+                      <div className="flex items-center gap-1 w-20">
+                        <span className="font-bold text-gray-900">{star}</span>
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      </div>
+                      <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <span className="font-semibold text-gray-700 w-12 text-right">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <h2 className="font-bebas text-3xl text-gray-900 mb-6">ULASAN TERBARU</h2>
+              
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white rounded-2xl p-6 border border-gray-200 animate-pulse">
+                      <div className="flex items-center mb-4">
+                        <div className="w-14 h-14 bg-gray-200 rounded-full mr-4"></div>
+                        <div className="flex-1">
+                          <div className="h-5 bg-gray-200 rounded w-32 mb-2"></div>
+                          <div className="h-4 bg-gray-200 rounded w-24"></div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-4 bg-gray-200 rounded"></div>
+                        <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-16 text-center border border-gray-200">
+                  <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <Star className="w-10 h-10 text-yellow-400" />
+                  </div>
+                  <h3 className="font-bebas text-2xl text-gray-900 mb-2">BELUM ADA ULASAN</h3>
+                  <p className="font-poppins text-gray-600">Jadilah yang pertama memberikan ulasan!</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
+                  {reviews.slice(0, 20).map((review, index) => {
+                    const gradients = [
+                      'from-purple-500 to-pink-500',
+                      'from-blue-500 to-cyan-500',
+                      'from-pink-500 to-rose-500',
+                      'from-green-500 to-emerald-500',
+                      'from-orange-500 to-amber-500',
+                    ];
+                    return (
+                      <div key={review.id} className="group bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                        <div className="flex items-start gap-4 mb-4">
+                          <div className="relative">
+                            <img
+                              src={`https://i.pravatar.cc/150?u=${review.user_id || review.id}`}
+                              alt={review.full_name}
+                              className="w-14 h-14 rounded-full border-2 border-gray-200 group-hover:border-purple-300 transition-colors"
+                            />
+                            <div className={`absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-r ${gradients[index % gradients.length]} rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg`}>
+                              {review.rating}
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-poppins font-bold text-lg text-gray-900 mb-1">
+                              {review.full_name || review.user_name}
+                            </h4>
+                            <div className="flex items-center gap-3">
+                              {renderStars(review.rating)}
+                              <span className="text-sm text-gray-500">
+                                {new Date(review.created_at).toLocaleDateString('id-ID', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <Quote className="absolute -top-2 -left-2 w-8 h-8 text-purple-200" />
+                          <p className="font-poppins text-gray-700 leading-relaxed pl-6 italic">
+                            "{review.comment}"
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Footer />
+
+      {/* Custom Scrollbar Styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #9333ea, #ec4899);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, #7e22ce, #db2777);
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default ReviewsPage;

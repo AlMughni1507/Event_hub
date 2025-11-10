@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
+import PageTransition from './components/PageTransition';
 import HomePage from './pages/main/HomePage';
 import MobileAppPage from './pages/main/MobileAppPage';
 import EventsPage from './pages/events/EventsPage';
@@ -12,11 +14,11 @@ import EventDashboard from './pages/events/EventDashboard';
 import LoginPage from './pages/auth/Login';
 import RegisterPage from './pages/auth/Register';
 import ContactPage from './pages/contact/ContactPage';
-import AboutPage from './pages/about/AboutPage';
 import BlogPage from './pages/blog/BlogPage';
 import ArticleDetailPage from './pages/blog/ArticleDetailPage';
 import SettingsPage from './pages/settings/profile';
 import AttendancePage from './pages/attendance/AttendancePage';
+import ReviewsPage from './pages/reviews/ReviewsPage';
 // Removed separate pages - now integrated into Settings
 
 // Admin Components
@@ -31,6 +33,7 @@ import Analytics from './pages/admin/Analytics';
 import StatisticsDashboard from './pages/admin/StatisticsDashboard';
 import CertificateManagement from './pages/admin/CertificateManagement';
 import BlogManagement from './pages/admin/BlogManagement';
+import ReviewsManagement from './pages/admin/ReviewsManagement';
 
 import './styles/theme.css';
 
@@ -40,21 +43,11 @@ const pageTransitionStyles = `
     position: relative;
     width: 100%;
     min-height: 100vh;
+    overflow-x: hidden;
   }
 
   .page-content {
-    animation: fadeInUp 0.5s ease-out forwards;
-  }
-
-  @keyframes fadeInUp {
-    0% {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    width: 100%;
   }
 `;
 // Protected Route component
@@ -85,14 +78,16 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="App">
-          <style>{pageTransitionStyles}</style>
-          <AnimatedRoutes />
-        </div>
-      </Router>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <Router>
+          <div className="App">
+            <style>{pageTransitionStyles}</style>
+            <AnimatedRoutes />
+          </div>
+        </Router>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 
@@ -101,25 +96,24 @@ const AnimatedRoutes = () => {
   const location = useLocation();
   
   return (
-    <div className="page-wrapper">
-      <div className="page-content">
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/mobile-app" element={<MobileAppPage />} />
-          <Route path="/events" element={<EventsPage />} />
-          <Route path="/events-dashboard" element={<EventDashboard />} />
-          <Route path="/events-list" element={<EventListPage />} />
-          <Route path="/events/create" element={<CreateEvent />} />
-          <Route path="/events/:id" element={<EventDetail />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:slug" element={<ArticleDetailPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/attendance/:eventId" element={<AttendancePage />} />
+    <div className="page-wrapper" style={{ backgroundColor: '#fff' }}>
+      <AnimatePresence mode="wait" initial={false}>
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
+          <Route path="/mobile-app" element={<PageTransition><MobileAppPage /></PageTransition>} />
+          <Route path="/events" element={<PageTransition><EventsPage /></PageTransition>} />
+          <Route path="/events-dashboard" element={<PageTransition><EventDashboard /></PageTransition>} />
+          <Route path="/events-list" element={<PageTransition><EventListPage /></PageTransition>} />
+          <Route path="/events/create" element={<PageTransition><CreateEvent /></PageTransition>} />
+          <Route path="/events/:id" element={<PageTransition><EventDetail /></PageTransition>} />
+          <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
+          <Route path="/register" element={<PageTransition><RegisterPage /></PageTransition>} />
+          <Route path="/contact" element={<PageTransition><ContactPage /></PageTransition>} />
+          <Route path="/blog" element={<PageTransition><BlogPage /></PageTransition>} />
+          <Route path="/blog/:slug" element={<PageTransition><ArticleDetailPage /></PageTransition>} />
+          <Route path="/settings" element={<PageTransition><SettingsPage /></PageTransition>} />
+          <Route path="/reviews" element={<PageTransition><ReviewsPage /></PageTransition>} />
+          <Route path="/attendance/:eventId" element={<PageTransition><AttendancePage /></PageTransition>} />
             
           {/* Admin Routes */}
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
@@ -134,13 +128,13 @@ const AnimatedRoutes = () => {
             <Route path="statistics" element={<StatisticsDashboard />} />
             <Route path="certificates" element={<CertificateManagement />} />
             <Route path="blogs" element={<BlogManagement />} />
+            <Route path="reviews" element={<ReviewsManagement />} />
           </Route>
             
           {/* Redirect any unknown routes to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AnimatePresence>
-      </div>
+        </Routes>
+      </AnimatePresence>
     </div>
   );
 };

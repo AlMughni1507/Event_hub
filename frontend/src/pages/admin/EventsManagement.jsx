@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmModal from '../../components/ConfirmModal';
+import { Calendar, Trash2, Edit, Eye, Star, Award, FileText, Image as ImageIcon, Download, FileSpreadsheet } from 'lucide-react';
 import api from '../../services/api';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, AlignmentType, WidthType, BorderStyle } from 'docx';
 
 const EventsManagement = () => {
+  const toast = useToast();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null });
+  const [generateConfirm, setGenerateConfirm] = useState({ show: false, event: null });
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -27,10 +36,17 @@ const EventsManagement = () => {
     tags: '',
     is_free: false,
     unlimited_participants: false,
-    image: null
+    has_certificate: false,
+    image: null,
+    image_aspect_ratio: '16:9'
   });
   const [imagePreview, setImagePreview] = useState(null);
   const [errors, setErrors] = useState({});
+  const [generatingCertificates, setGeneratingCertificates] = useState(false);
+  const [showCertificatePreview, setShowCertificatePreview] = useState(false);
+  const [selectedEventForCert, setSelectedEventForCert] = useState(null);
+  const [performers, setPerformers] = useState([]);
+  const [performerInputs, setPerformerInputs] = useState([{ name: '', photo: null, photoPreview: null }]);
 
   useEffect(() => {
     fetchEvents();
@@ -40,10 +56,13 @@ const EventsManagement = () => {
   const fetchEvents = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Fetching events...');
       const response = await api.get('/events');
-      setEvents(response.data.events || response.data.data || []);
+      const eventsData = response.data.events || response.data.data || [];
+      console.log('✅ Events fetched:', eventsData.length, eventsData);
+      setEvents(eventsData);
     } catch (error) {
-      console.error('Error fetching events:', error);
+      console.error('❌ Error fetching events:', error);
     } finally {
       setLoading(false);
     }
@@ -52,9 +71,266 @@ const EventsManagement = () => {
   const fetchCategories = async () => {
     try {
       const response = await api.get('/categories');
-      setCategories(response.data.categories || response.data.data || []);
+      console.log('Categories API Response:', response.data);
+      const categoriesData = response.data.categories || response.data.data?.categories || response.data.data || [];
+      console.log('Categories extracted:', categoriesData);
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      setCategories([]);
+    }
+  };
+
+  // ============ EXPORT FUNCTIONS ============
+  
+  // Fetch detailed event report data
+  const fetchEventReportData = async (eventId) => {
+    try {
+      const [registrationsRes, paymentsRes] = await Promise.all([
+        api.get(`/event-registrations/event/${eventId}`),
+        api.get(`/payments/event/${eventId}`)
+      ]);
+      
+      const registrations = registrationsRes.data || registrationsRes.data?.data || [];
+      const payments = paymentsRes.data || paymentsRes.data?.data || [];
+      
+      return { registrations, payments };
+    } catch (error) {
+      console.error('Error fetching report data:', error);
+      throw error;
+    }
+  };
+
+  // Export to Excel
+  const exportToExcel = async (event) => {
+    try {
+      toast.info('Mengambil data laporan...');
+      
+      const { registrations, payments } = await fetchEventReportData(event.id);
+      
+      // Calculate total revenue
+      const totalRevenue = payments
+        .filter(p => p.status === 'success' || p.status === 'confirmed')
+        .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+      
+      // Summary data
+      const summaryData = [
+        ['LAPORAN EVENT'],
+        [],
+        ['Nama Event', event.title],
+        ['Tanggal Event', new Date(event.event_date).toLocaleDateString('id-ID')],
+        ['Lokasi', event.location || '-'],
+        ['Kategori', event.category_name || '-'],
+        [],
+        ['RINGKASAN'],
+        ['Total Peserta Terdaftar', registrations.length],
+        ['Total Peserta Hadir', registrations.filter(r => r.attendance_status === 'attended').length],
+        ['Total Pendapatan', `Rp ${totalRevenue.toLocaleString('id-ID')}`],
+        ['Harga Tiket', event.is_free ? 'GRATIS' : `Rp ${(event.price || 0).toLocaleString('id-ID')}`],
+        []
+      ];
+      
+      // Participant data
+      const participantHeaders = [
+        'No',
+        'Nama Peserta',
+        'Email',
+        'No. HP',
+        'Status Registrasi',
+        'Status Kehadiran',
+        'Tanggal Daftar',
+        'Jumlah Bayar'
+      ];
+      
+      const participantData = registrations.map((reg, index) => {
+        const payment = payments.find(p => p.user_id === reg.user_id);
+        return [
+          index + 1,
+          reg.user_name || reg.full_name || '-',
+          reg.user_email || reg.email || '-',
+          reg.user_phone || reg.phone || '-',
+          reg.status || 'pending',
+          reg.attendance_status || 'not_attended',
+          new Date(reg.registration_date || reg.created_at).toLocaleDateString('id-ID'),
+          payment ? `Rp ${parseFloat(payment.amount || 0).toLocaleString('id-ID')}` : '-'
+        ];
+      });
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      
+      // Summary sheet
+      const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, ws1, 'Ringkasan');
+      
+      // Participants sheet
+      const ws2 = XLSX.utils.aoa_to_sheet([participantHeaders, ...participantData]);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Daftar Peserta');
+      
+      // Generate filename
+      const filename = `Laporan_${event.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Save file
+      XLSX.writeFile(wb, filename);
+      
+      toast.success('Laporan Excel berhasil didownload!');
+    } catch (error) {
+      console.error('Export Excel error:', error);
+      toast.error('Gagal export laporan Excel');
+    }
+  };
+
+  // Export to Word
+  const exportToWord = async (event) => {
+    try {
+      toast.info('Mengambil data laporan...');
+      
+      const { registrations, payments } = await fetchEventReportData(event.id);
+      
+      // Calculate totals
+      const totalRevenue = payments
+        .filter(p => p.status === 'success' || p.status === 'confirmed')
+        .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+      const totalAttended = registrations.filter(r => r.attendance_status === 'attended').length;
+      
+      // Create document
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            // Title
+            new Paragraph({
+              text: 'LAPORAN EVENT',
+              heading: 'Heading1',
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 }
+            }),
+            
+            // Event Details
+            new Paragraph({
+              text: 'DETAIL EVENT',
+              heading: 'Heading2',
+              spacing: { before: 200, after: 200 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Nama Event: ', bold: true }),
+                new TextRun(event.title)
+              ],
+              spacing: { after: 100 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Tanggal: ', bold: true }),
+                new TextRun(new Date(event.event_date).toLocaleDateString('id-ID'))
+              ],
+              spacing: { after: 100 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Lokasi: ', bold: true }),
+                new TextRun(event.location || '-')
+              ],
+              spacing: { after: 100 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Kategori: ', bold: true }),
+                new TextRun(event.category_name || '-')
+              ],
+              spacing: { after: 300 }
+            }),
+            
+            // Summary
+            new Paragraph({
+              text: 'RINGKASAN',
+              heading: 'Heading2',
+              spacing: { before: 200, after: 200 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Total Peserta Terdaftar: ', bold: true }),
+                new TextRun(registrations.length.toString())
+              ],
+              spacing: { after: 100 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Total Peserta Hadir: ', bold: true }),
+                new TextRun(totalAttended.toString())
+              ],
+              spacing: { after: 100 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Total Pendapatan: ', bold: true }),
+                new TextRun(`Rp ${totalRevenue.toLocaleString('id-ID')}`)
+              ],
+              spacing: { after: 100 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Harga Tiket: ', bold: true }),
+                new TextRun(event.is_free ? 'GRATIS' : `Rp ${(event.price || 0).toLocaleString('id-ID')}`)
+              ],
+              spacing: { after: 300 }
+            }),
+            
+            // Participants Table
+            new Paragraph({
+              text: 'DAFTAR PESERTA',
+              heading: 'Heading2',
+              spacing: { before: 200, after: 200 }
+            }),
+            
+            new Table({
+              rows: [
+                // Header
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph({ text: 'No', bold: true })] }),
+                    new TableCell({ children: [new Paragraph({ text: 'Nama', bold: true })] }),
+                    new TableCell({ children: [new Paragraph({ text: 'Email', bold: true })] }),
+                    new TableCell({ children: [new Paragraph({ text: 'Status', bold: true })] }),
+                    new TableCell({ children: [new Paragraph({ text: 'Kehadiran', bold: true })] })
+                  ]
+                }),
+                // Data rows
+                ...registrations.map((reg, index) => new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph((index + 1).toString())] }),
+                    new TableCell({ children: [new Paragraph(reg.user_name || reg.full_name || '-')] }),
+                    new TableCell({ children: [new Paragraph(reg.user_email || reg.email || '-')] }),
+                    new TableCell({ children: [new Paragraph(reg.status || 'pending')] }),
+                    new TableCell({ children: [new Paragraph(reg.attendance_status || 'not_attended')] })
+                  ]
+                }))
+              ],
+              width: { size: 100, type: WidthType.PERCENTAGE }
+            }),
+            
+            // Footer
+            new Paragraph({
+              text: `\nDibuat pada: ${new Date().toLocaleString('id-ID')}`,
+              alignment: AlignmentType.RIGHT,
+              spacing: { before: 400 }
+            })
+          ]
+        }]
+      });
+      
+      // Generate filename
+      const filename = `Laporan_${event.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.docx`;
+      
+      // Save file
+      Packer.toBlob(doc).then(blob => {
+        saveAs(blob, filename);
+        toast.success('Laporan Word berhasil didownload!');
+      });
+      
+    } catch (error) {
+      console.error('Export Word error:', error);
+      toast.error('Gagal export laporan Word');
     }
   };
 
@@ -70,11 +346,11 @@ const EventsManagement = () => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Ukuran file terlalu besar! Maksimal 5MB');
+        toast.error('Ukuran file terlalu besar! Maksimal 5MB');
         return;
       }
       if (!file.type.startsWith('image/')) {
-        alert('File harus berupa gambar!');
+        toast.error('File harus berupa gambar!');
         return;
       }
       setFormData(prev => ({ ...prev, image: file }));
@@ -93,22 +369,95 @@ const EventsManagement = () => {
     setImagePreview(null);
   };
 
+  // Performer handlers
+  const addPerformerInput = () => {
+    setPerformerInputs([...performerInputs, { name: '', photo: null, photoPreview: null }]);
+  };
+
+  const removePerformerInput = (index) => {
+    const newInputs = performerInputs.filter((_, i) => i !== index);
+    setPerformerInputs(newInputs.length > 0 ? newInputs : [{ name: '', photo: null, photoPreview: null }]);
+  };
+
+  const handlePerformerNameChange = (index, name) => {
+    const newInputs = [...performerInputs];
+    newInputs[index].name = name;
+    setPerformerInputs(newInputs);
+  };
+
+  const handlePerformerPhotoChange = (index, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Ukuran file terlalu besar! Maksimal 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error('File harus berupa gambar!');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newInputs = [...performerInputs];
+        newInputs[index].photo = file;
+        newInputs[index].photoPreview = reader.result;
+        setPerformerInputs(newInputs);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePerformerPhoto = (index) => {
+    const newInputs = [...performerInputs];
+    newInputs[index].photo = null;
+    newInputs[index].photoPreview = null;
+    setPerformerInputs(newInputs);
+  };
+
   const handleCreateEvent = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrors({});
 
     try {
-      // Basic validations
+      // Validate
       const newErrors = {};
       if (!formData.title || formData.title.trim().length < 5) newErrors.title = 'Judul minimal 5 karakter';
       if (!formData.description || formData.description.trim().length < 20) newErrors.description = 'Deskripsi minimal 20 karakter';
       if (!formData.event_date) newErrors.event_date = 'Tanggal & waktu mulai wajib diisi';
       if (!formData.category_id) newErrors.category_id = 'Kategori wajib dipilih';
       if (!formData.is_online && !formData.location) newErrors.location = 'Lokasi wajib diisi untuk event offline';
+      
+      // Validate end_date is not before event_date
+      if (formData.end_date && formData.event_date) {
+        const startDate = new Date(formData.event_date);
+        const endDate = new Date(formData.end_date);
+        if (endDate < startDate) {
+          newErrors.end_date = 'Tanggal selesai tidak boleh lebih awal dari tanggal mulai';
+        }
+      }
+      
+      // Validate event_date is not in the past
+      if (formData.event_date) {
+        const eventDate = new Date(formData.event_date);
+        const now = new Date();
+        if (eventDate < now) {
+          newErrors.event_date = 'Tanggal event tidak boleh di masa lalu';
+        }
+      }
+      
       if (Object.keys(newErrors).length) {
         setErrors(newErrors);
         setLoading(false);
+        toast.error('Mohon perbaiki error pada form');
+        
+        // Scroll to top of form instead of auto-scroll to error input
+        const formElement = document.getElementById('create-event-form');
+        if (formElement) {
+          formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        
         return;
       }
 
@@ -137,6 +486,7 @@ const EventsManagement = () => {
       submitData.append('max_participants', formData.unlimited_participants ? 0 : parseInt(formData.max_participants));
       submitData.append('price', parseFloat(formData.registration_fee));
       submitData.append('is_free', formData.is_free || parseFloat(formData.registration_fee) === 0);
+      submitData.append('has_certificate', formData.has_certificate);
       // Derived tiers
       const priceNumber = parseFloat(formData.registration_fee) || 0;
       const premiumPrice = Math.round(priceNumber * 1.15);
@@ -146,20 +496,46 @@ const EventsManagement = () => {
       if (formData.registration_deadline) submitData.append('registration_deadline', formData.registration_deadline);
       if (formData.tags) submitData.append('tags', formData.tags);
       submitData.append('is_online', formData.is_online);
+      submitData.append('image_aspect_ratio', formData.image_aspect_ratio || '16:9');
       
       if (formData.image) {
         submitData.append('image', formData.image);
       }
 
       console.log('Creating event with image...');
-      await api.post('/events', submitData, {
+      const eventResponse = await api.post('/events', submitData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
       
-      alert('Event berhasil dibuat!');
-      setShowCreateModal(false);
+      const createdEventId = eventResponse.data.event?.id || eventResponse.data.data?.id || eventResponse.data.id;
+      
+      // Save performers if any
+      const validPerformers = performerInputs.filter(p => p.name.trim() !== '');
+      if (validPerformers.length > 0 && createdEventId) {
+        for (let i = 0; i < validPerformers.length; i++) {
+          const performer = validPerformers[i];
+          const performerData = new FormData();
+          performerData.append('event_id', createdEventId);
+          performerData.append('name', performer.name);
+          performerData.append('display_order', i);
+          if (performer.photo) {
+            performerData.append('photo', performer.photo);
+          }
+          
+          try {
+            await api.post('/performers', performerData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+            });
+          } catch (err) {
+            console.error('Error saving performer:', err);
+          }
+        }
+      }
+      
+      toast.success('Event berhasil dibuat!');
+      setShowCreateForm(false);
       setFormData({
         title: '',
         description: '',
@@ -179,28 +555,33 @@ const EventsManagement = () => {
         tags: '',
         is_free: false,
         unlimited_participants: false,
-        image: null
+        has_certificate: false,
+        image: null,
+        image_aspect_ratio: '16:9'
       });
       setImagePreview(null);
+      setPerformerInputs([{ name: '', photo: null, photoPreview: null }]);
       fetchEvents();
     } catch (error) {
       console.error('Error creating event:', error);
-      alert(error?.message || 'Gagal membuat event. Silakan coba lagi.');
+      toast.error(error?.message || 'Gagal membuat event. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteEvent = async (id) => {
-    if (window.confirm('Yakin ingin menghapus event ini?')) {
-      try {
-        await api.delete(`/events/${id}`);
-        alert('Event berhasil dihapus!');
-        fetchEvents();
-      } catch (error) {
-        console.error('Error deleting event:', error);
-        alert('Gagal hapus event.');
-      }
+  const handleDeleteEvent = (id) => {
+    setDeleteConfirm({ show: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/events/${deleteConfirm.id}`);
+      toast.success('Event berhasil dihapus!');
+      fetchEvents();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast.error('Gagal hapus event.');
     }
   };
 
@@ -211,15 +592,45 @@ const EventsManagement = () => {
         is_highlighted: newStatus
       });
       
-      alert(newStatus ? 
-        '✨ Event berhasil di-set sebagai Highlight Event! Event ini akan muncul di Hero Section homepage.' : 
+      toast.success(newStatus ? 
+        'Event berhasil di-set sebagai Highlight Event! Event ini akan muncul di Hero Section homepage.' : 
         'Event highlight berhasil dihapus.'
       );
       fetchEvents();
     } catch (error) {
       console.error('Error toggling highlight:', error);
-      alert('Gagal mengubah status highlight event.');
+      toast.error('Gagal mengubah status highlight event.');
     }
+  };
+
+  const handleGenerateCertificates = (event) => {
+    if (!event.has_certificate) {
+      toast.warning('Event ini tidak memiliki fitur sertifikat');
+      return;
+    }
+    setGenerateConfirm({ show: true, event });
+  };
+
+  const confirmGenerateCertificates = async () => {
+
+    try {
+      setGeneratingCertificates(true);
+      const event = generateConfirm.event;
+      const response = await api.post(`/events/${event.id}/generate-certificates`);
+      
+      toast.success(`Berhasil generate ${response.data.generated || 0} sertifikat untuk event "${event.title}"!`);
+      fetchEvents();
+    } catch (error) {
+      console.error('Error generating certificates:', error);
+      toast.error('Gagal generate sertifikat: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setGeneratingCertificates(false);
+    }
+  };
+
+  const handlePreviewCertificate = (event) => {
+    setSelectedEventForCert(event);
+    setShowCertificatePreview(true);
   };
 
   const filteredEvents = events.filter(event =>
@@ -255,15 +666,27 @@ const EventsManagement = () => {
               </h1>
               <p className="text-gray-600">Kelola dan pantau semua event Anda dalam satu tempat</p>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="group relative inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Buat Event Baru
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={fetchEvents}
+                className="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-6 py-4 rounded-xl font-semibold shadow-sm hover:shadow-md border-2 border-gray-200 transition-all duration-200"
+                title="Refresh events list"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="group relative inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Buat Event Baru
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -362,7 +785,7 @@ const EventsManagement = () => {
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Belum Ada Event</h3>
                 <p className="text-gray-600 mb-6">Mulai buat event pertama Anda dan jangkau lebih banyak peserta</p>
                 <button
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={() => setShowCreateForm(true)}
                   className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -469,6 +892,73 @@ const EventsManagement = () => {
                         </svg>
                         {event.is_highlighted ? '★ Highlighted' : 'Set Highlight'}
                       </button>
+
+                      {/* Export Report Dropdown - AVAILABLE FOR ALL EVENTS */}
+                      <div className="relative group/export">
+                        <button
+                          className="group/btn flex items-center gap-2 bg-gradient-to-r from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 text-blue-600 hover:text-blue-700 px-4 py-2 rounded-lg transition-all duration-200 font-medium border border-blue-200"
+                          title="Download Laporan Event"
+                        >
+                          <Download className="w-4 h-4" />
+                          Laporan
+                        </button>
+                        
+                        {/* Dropdown Menu */}
+                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border-2 border-gray-100 opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all duration-200 z-10">
+                          <div className="p-2 space-y-1">
+                            <button
+                              onClick={() => exportToExcel(event)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-green-50 rounded-lg transition-all group/item"
+                            >
+                              <FileSpreadsheet className="w-5 h-5 text-green-600" />
+                              <div>
+                                <div className="font-semibold text-gray-900 text-sm group-hover/item:text-green-600">Excel (.xlsx)</div>
+                                <div className="text-xs text-gray-500">Laporan detail peserta</div>
+                              </div>
+                            </button>
+                            
+                            <button
+                              onClick={() => exportToWord(event)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50 rounded-lg transition-all group/item"
+                            >
+                              <FileText className="w-5 h-5 text-blue-600" />
+                              <div>
+                                <div className="font-semibold text-gray-900 text-sm group-hover/item:text-blue-600">Word (.docx)</div>
+                                <div className="text-xs text-gray-500">Laporan format dokumen</div>
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Certificate Buttons - Only show if event has_certificate */}
+                      {event.has_certificate && (
+                        <>
+                          <button
+                            onClick={() => handlePreviewCertificate(event)}
+                            className="group/btn flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-600 hover:text-indigo-700 px-4 py-2 rounded-lg transition-all duration-200 font-medium border border-indigo-200"
+                            title="Preview template sertifikat"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            Preview
+                          </button>
+                          
+                          <button
+                            onClick={() => handleGenerateCertificates(event)}
+                            disabled={generatingCertificates}
+                            className="group/btn flex items-center gap-2 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 text-green-600 hover:text-green-700 px-4 py-2 rounded-lg transition-all duration-200 font-medium border border-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Generate sertifikat untuk semua peserta yang hadir"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {generatingCertificates ? 'Generating...' : 'Generate Sertifikat'}
+                          </button>
+                        </>
+                      )}
                       
                       <button
                         onClick={() => handleDeleteEvent(event.id)}
@@ -488,26 +978,55 @@ const EventsManagement = () => {
         )}
       </div>
 
-      {/* Create Event Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-8 max-w-5xl w-full max-h-[92vh] overflow-y-auto shadow-2xl animate-scale-in">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">Buat Event Baru</h2>
-                <p className="text-gray-600">Isi detail event yang akan Anda buat</p>
+      {/* Create Event Full Page Form */}
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 z-50 overflow-y-auto">
+          <div className="min-h-screen">
+            {/* Header with back button */}
+            <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
+              <div className="max-w-7xl mx-auto px-6 py-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setShowCreateForm(false)}
+                      className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
+                    >
+                      <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <div>
+                      <h2 className="text-3xl font-bold text-gray-900">Buat Event Baru</h2>
+                      <p className="text-gray-600">Isi detail event yang akan Anda buat</p>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    form="create-event-form"
+                    disabled={loading}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        Menyimpan...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Simpan Event
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
 
-            <form onSubmit={handleCreateEvent} className="space-y-8">
+            {/* Form Content */}
+            <div className="max-w-7xl mx-auto px-6 py-8">
+              <form id="create-event-form" onSubmit={handleCreateEvent} className="space-y-8" noValidate>
               {/* Grid layout: Form left, Live preview right */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-6">
@@ -601,13 +1120,81 @@ const EventsManagement = () => {
                   )}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Upload foto untuk menarik lebih banyak peserta</p>
+                
+                {/* Aspect Ratio Selector */}
+                <div className="mt-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Aspect Ratio Foto Card
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, image_aspect_ratio: '9:16' }))}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        formData.image_aspect_ratio === '9:16'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className={`w-12 h-20 rounded border-2 ${
+                          formData.image_aspect_ratio === '9:16' ? 'border-blue-500 bg-blue-100' : 'border-gray-300 bg-gray-100'
+                        }`}></div>
+                        <span className={`text-sm font-medium ${
+                          formData.image_aspect_ratio === '9:16' ? 'text-blue-600' : 'text-gray-700'
+                        }`}>9:16 Portrait</span>
+                      </div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, image_aspect_ratio: '1:1' }))}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        formData.image_aspect_ratio === '1:1'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className={`w-16 h-16 rounded border-2 ${
+                          formData.image_aspect_ratio === '1:1' ? 'border-blue-500 bg-blue-100' : 'border-gray-300 bg-gray-100'
+                        }`}></div>
+                        <span className={`text-sm font-medium ${
+                          formData.image_aspect_ratio === '1:1' ? 'text-blue-600' : 'text-gray-700'
+                        }`}>1:1 Square</span>
+                      </div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, image_aspect_ratio: '16:9' }))}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        formData.image_aspect_ratio === '16:9'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className={`w-20 h-12 rounded border-2 ${
+                          formData.image_aspect_ratio === '16:9' ? 'border-blue-500 bg-blue-100' : 'border-gray-300 bg-gray-100'
+                        }`}></div>
+                        <span className={`text-sm font-medium ${
+                          formData.image_aspect_ratio === '16:9' ? 'text-blue-600' : 'text-gray-700'
+                        }`}>16:9 Landscape</span>
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Pilih aspect ratio yang sesuai dengan desain foto event Anda
+                  </p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Date & Time */}
+                {/* Start Date & Time */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Tanggal & Waktu *
+                    Tanggal & Waktu Mulai *
                   </label>
                   <input
                     type="datetime-local"
@@ -615,21 +1202,33 @@ const EventsManagement = () => {
                     value={formData.event_date}
                     onChange={handleInputChange}
                     required
+                    min={new Date().toISOString().slice(0, 16)}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Event harus dimulai dari sekarang atau di masa depan</p>
                   {errors.event_date && <p className="text-sm text-red-600 mt-1">{errors.event_date}</p>}
                 </div>
 
                 {/* End Date & Time */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Selesai (opsional)</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Tanggal & Waktu Selesai (opsional)
+                  </label>
                   <input
                     type="datetime-local"
                     name="end_date"
                     value={formData.end_date}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    min={formData.event_date || new Date().toISOString().slice(0, 16)}
+                    disabled={!formData.event_date}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {!formData.event_date 
+                      ? '⚠️ Pilih tanggal mulai terlebih dahulu' 
+                      : 'Tanggal selesai tidak boleh lebih awal dari tanggal mulai'}
+                  </p>
+                  {errors.end_date && <p className="text-sm text-red-600 mt-1">{errors.end_date}</p>}
                 </div>
 
                 {/* Category */}
@@ -702,21 +1301,45 @@ const EventsManagement = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Maksimal Peserta *
                   </label>
-                  <input
-                    type="number"
-                    name="max_participants"
-                    value={formData.max_participants}
-                    onChange={handleInputChange}
-                    required
-                    min="1"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Contoh: 100"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Masukkan jumlah maksimal peserta</p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <input type="checkbox" name="unlimited_participants" checked={formData.unlimited_participants} onChange={handleInputChange} className="w-5 h-5" />
-                    <span className="text-sm text-gray-700">Peserta tak terbatas</span>
+                  
+                  {/* Unlimited Participants Checkbox */}
+                  <div className="mb-3 flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
+                    <input 
+                      type="checkbox" 
+                      name="unlimited_participants" 
+                      checked={formData.unlimited_participants} 
+                      onChange={handleInputChange} 
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" 
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-semibold text-gray-900">Unlimited Participants</span>
+                      <p className="text-xs text-gray-600">No limit on participant registration</p>
+                    </div>
                   </div>
+                  
+                  {/* Max Participants Input - Hidden if unlimited */}
+                  {!formData.unlimited_participants && (
+                    <>
+                      <input
+                        type="number"
+                        name="max_participants"
+                        value={formData.max_participants}
+                        onChange={handleInputChange}
+                        required={!formData.unlimited_participants}
+                        min="1"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Contoh: 100"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Masukkan jumlah maksimal peserta</p>
+                    </>
+                  )}
+                  
+                  {/* Show message when unlimited */}
+                  {formData.unlimited_participants && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700 font-medium">✓ Peserta tidak terbatas</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Registration Fee */}
@@ -724,33 +1347,81 @@ const EventsManagement = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Harga Tiket (Rp) *
                   </label>
-                  <input
-                    type="number"
-                    name="registration_fee"
-                    value={formData.registration_fee}
-                    onChange={handleInputChange}
-                    required
-                    min="0"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Contoh: 50000 atau 0 untuk gratis"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Masukkan 0 atau centang gratis untuk event gratis</p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <input type="checkbox" name="is_free" checked={formData.is_free} onChange={handleInputChange} className="w-5 h-5" />
-                    <span className="text-sm text-gray-700">Event gratis</span>
-                  </div>
-                  {/* Tiered price preview */}
-                  <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <p className="text-sm font-semibold text-gray-700 mb-1">Tingkat Harga</p>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Reguler</span>
-                      <span className="font-semibold">{(Number(formData.registration_fee) || 0).toLocaleString('id-ID')}</span>
+                  
+                  {/* Checkboxes */}
+                  <div className="mb-4 space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200">
+                      <input 
+                        type="checkbox" 
+                        name="is_free" 
+                        checked={formData.is_free} 
+                        onChange={handleInputChange} 
+                        className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500" 
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-semibold text-gray-900">Free Event</span>
+                        <p className="text-xs text-gray-600">This event is free for all participants</p>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-sm mt-1">
-                      <span>Premium (+15%)</span>
-                      <span className="font-semibold">{Math.round((Number(formData.registration_fee) || 0) * 1.15).toLocaleString('id-ID')}</span>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg hover:from-purple-100 hover:to-pink-100 transition-colors border border-purple-200">
+                      <input 
+                        type="checkbox" 
+                        name="has_certificate" 
+                        checked={formData.has_certificate} 
+                        onChange={handleInputChange} 
+                        className="w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500" 
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-900">Certificate Available</span>
+                          <span className="px-2 py-0.5 bg-purple-600 text-white text-xs font-bold rounded-full">NEW</span>
+                        </div>
+                        <p className="text-xs text-gray-600">Participants will receive a certificate upon completion</p>
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* Price Input - Hidden if free */}
+                  {!formData.is_free && (
+                    <>
+                      <input
+                        type="number"
+                        name="registration_fee"
+                        value={formData.registration_fee}
+                        onChange={handleInputChange}
+                        required={!formData.is_free}
+                        min="0"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Contoh: 50000"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Masukkan harga tiket dalam Rupiah</p>
+                      
+                      {/* Tiered price preview - Only show if not free */}
+                      <div className="mt-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          <span>💰</span> Tingkat Harga
+                        </p>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm bg-white/50 rounded px-3 py-2">
+                            <span className="text-gray-700">Reguler</span>
+                            <span className="font-bold text-blue-600">Rp {(Number(formData.registration_fee) || 0).toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm bg-white/50 rounded px-3 py-2">
+                            <span className="text-gray-700">Premium (+15%)</span>
+                            <span className="font-bold text-purple-600">Rp {Math.round((Number(formData.registration_fee) || 0) * 1.15).toLocaleString('id-ID')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Show message when free */}
+                  {formData.is_free && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-700 font-medium">✓ Event Gratis - Tidak ada biaya pendaftaran</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -765,68 +1436,389 @@ const EventsManagement = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <div className="flex gap-4 pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-200"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <span className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                      Membuat Event...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Buat Event
-                    </span>
-                  )}
-                </button>
-              </div>
+              {/* Line-ups / Performers Section */}
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <span>🎤</span> Line-ups / Performers
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">Tambahkan performer atau pembicara untuk event ini</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addPerformerInput}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-lg font-medium shadow-sm hover:shadow-md transition-all"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Tambah Performer
+                  </button>
                 </div>
 
-                {/* Live Preview */}
+                <div className="space-y-4">
+                  {performerInputs.map((performer, index) => (
+                    <div key={index} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6">
+                      <div className="flex items-start gap-4">
+                        {/* Photo Preview/Upload */}
+                        <div className="flex-shrink-0">
+                          <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-gray-300 bg-white">
+                            {performer.photoPreview ? (
+                              <div className="relative w-full h-full">
+                                <img 
+                                  src={performer.photoPreview} 
+                                  alt="Performer preview" 
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removePerformerPhoto(index)}
+                                  className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full transition-colors"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                                <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span className="text-xs text-gray-500 text-center px-1">Upload Foto</span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={(e) => handlePerformerPhotoChange(index, e)}
+                                />
+                              </label>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1 text-center">Max 5MB</p>
+                        </div>
+
+                        {/* Name Input */}
+                        <div className="flex-1">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Nama Performer {index + 1}
+                          </label>
+                          <input
+                            type="text"
+                            value={performer.name}
+                            onChange={(e) => handlePerformerNameChange(index, e.target.value)}
+                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Nama performer atau pembicara"
+                          />
+                        </div>
+
+                        {/* Remove Button */}
+                        {performerInputs.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removePerformerInput(index)}
+                            className="flex-shrink-0 mt-7 p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-colors"
+                            title="Hapus performer"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {performerInputs.length === 0 && (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <p className="text-gray-500">Belum ada performer. Klik "Tambah Performer" untuk menambahkan.</p>
+                  </div>
+                )}
+              </div>
+
+                </div>
+
+                {/* Live Preview - Larger with 16:9 aspect ratio */}
                 <div className="hidden lg:block">
-                  <div className="sticky top-4">
+                  <div className="sticky top-24">
                     <div className="bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-2xl p-6 shadow-xl">
-                      <h3 className="text-xl font-semibold mb-4">Preview Kartu Event</h3>
-                      <div className="bg-white rounded-xl p-5 text-gray-900">
-                        <div className="aspect-video bg-gray-100 rounded-lg mb-4 overflow-hidden">
+                      <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Preview Kartu Event
+                      </h3>
+                      <div className="bg-white rounded-2xl overflow-hidden shadow-lg">
+                        {/* Image with dynamic aspect ratio */}
+                        <div className="w-full" style={{ aspectRatio: formData.image_aspect_ratio?.replace(':', '/') || '16/9' }}>
                           {imagePreview ? (
                             <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">Tidak ada gambar</div>
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                              <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <p className="text-gray-400 text-sm font-medium">Belum ada gambar</p>
+                              <p className="text-gray-400 text-xs">{formData.image_aspect_ratio || '16:9'} aspect ratio</p>
+                            </div>
                           )}
                         </div>
-                        <h4 className="text-lg font-bold mb-1 line-clamp-2">{formData.title || 'Judul Event'}</h4>
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">{formData.short_description || formData.description || 'Deskripsi singkat event...'}</p>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-block w-2 h-2 bg-blue-600 rounded-full"></span>
-                            <span>{formData.event_date ? new Date(formData.event_date).toLocaleString('id-ID') : '-'}</span>
+                        
+                        {/* Event Details */}
+                        <div className="p-6 text-gray-900">
+                          <div className="mb-3">
+                            <h4 className="text-2xl font-bold mb-2 line-clamp-2">
+                              {formData.title || 'Judul Event Anda'}
+                            </h4>
+                            <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">
+                              {formData.short_description || formData.description || 'Deskripsi singkat event akan muncul di sini. Tulis deskripsi yang menarik untuk menarik perhatian peserta.'}
+                            </p>
                           </div>
-                          <div className="text-right font-semibold">{parseFloat(formData.registration_fee || 0) === 0 ? 'Gratis' : `Rp ${Number(formData.registration_fee).toLocaleString('id-ID')}`}</div>
+                          
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span>{formData.event_date ? new Date(formData.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Tanggal belum dipilih'}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xl font-bold text-blue-600">
+                                {parseFloat(formData.registration_fee || 0) === 0 ? 'Gratis' : `Rp ${Number(formData.registration_fee).toLocaleString('id-ID')}`}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
+                      
+                      {/* Info Text */}
+                      <p className="text-xs text-blue-100 mt-3 text-center">
+                        Preview ini menunjukkan bagaimana event Anda akan tampil di halaman utama
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Certificate Preview Modal - Professional Template */}
+      {showCertificatePreview && selectedEventForCert && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-6 rounded-t-3xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-1">Preview Template Sertifikat</h2>
+                  <p className="text-blue-100">Template sertifikat untuk: {selectedEventForCert.title}</p>
+                </div>
+                <button
+                  onClick={() => setShowCertificatePreview(false)}
+                  className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Certificate Template */}
+            <div className="p-8">
+              <div 
+                className="bg-white border-8 border-double border-blue-600 rounded-2xl p-12 shadow-xl"
+                style={{
+                  backgroundImage: `
+                    linear-gradient(to bottom right, rgba(59, 130, 246, 0.03), rgba(147, 51, 234, 0.03)),
+                    repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(59, 130, 246, 0.03) 10px, rgba(59, 130, 246, 0.03) 20px)
+                  `
+                }}
+              >
+                {/* Corner Ornaments */}
+                <div className="relative">
+                  {/* Top Left Ornament */}
+                  <div className="absolute top-0 left-0 w-24 h-24">
+                    <svg viewBox="0 0 100 100" className="text-blue-600 opacity-20">
+                      <path d="M0,0 L100,0 L100,20 C70,20 50,40 50,70 L50,100 L30,100 C30,70 10,50 0,20 Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  
+                  {/* Top Right Ornament */}
+                  <div className="absolute top-0 right-0 w-24 h-24 rotate-90">
+                    <svg viewBox="0 0 100 100" className="text-purple-600 opacity-20">
+                      <path d="M0,0 L100,0 L100,20 C70,20 50,40 50,70 L50,100 L30,100 C30,70 10,50 0,20 Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  
+                  {/* Bottom Left Ornament */}
+                  <div className="absolute bottom-0 left-0 w-24 h-24 -rotate-90">
+                    <svg viewBox="0 0 100 100" className="text-purple-600 opacity-20">
+                      <path d="M0,0 L100,0 L100,20 C70,20 50,40 50,70 L50,100 L30,100 C30,70 10,50 0,20 Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  
+                  {/* Bottom Right Ornament */}
+                  <div className="absolute bottom-0 right-0 w-24 h-24 rotate-180">
+                    <svg viewBox="0 0 100 100" className="text-blue-600 opacity-20">
+                      <path d="M0,0 L100,0 L100,20 C70,20 50,40 50,70 L50,100 L30,100 C30,70 10,50 0,20 Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+
+                  {/* Certificate Content */}
+                  <div className="text-center relative z-10">
+                    {/* Logo/Emblem */}
+                    <div className="mb-6 flex justify-center">
+                      <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                        <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* Header */}
+                    <div className="mb-8">
+                      <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-3" style={{ fontFamily: 'Georgia, serif' }}>
+                        CERTIFICATE
+                      </h1>
+                      <div className="w-48 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto mb-4"></div>
+                      <p className="text-xl text-gray-700 font-semibold">OF COMPLETION</p>
+                    </div>
+
+                    {/* Awarded To */}
+                    <div className="mb-8">
+                      <p className="text-gray-600 text-lg mb-4">This is proudly presented to</p>
+                      <h2 className="text-4xl font-bold text-gray-900 mb-2 border-b-2 border-blue-600 inline-block px-8 pb-2">
+                        [PARTICIPANT NAME]
+                      </h2>
+                    </div>
+
+                    {/* Event Details */}
+                    <div className="mb-8 max-w-2xl mx-auto">
+                      <p className="text-gray-700 text-base leading-relaxed">
+                        For successfully completing and attending
+                      </p>
+                      <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 my-4">
+                        {selectedEventForCert.title}
+                      </h3>
+                      <p className="text-gray-600 text-sm">
+                        Held on {new Date(selectedEventForCert.event_date).toLocaleDateString('en-US', { 
+                          day: 'numeric', 
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}
+                      </p>
+                      {selectedEventForCert.location && (
+                        <p className="text-gray-600 text-sm">
+                          at {selectedEventForCert.location}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Footer with Signature */}
+                    <div className="grid grid-cols-2 gap-12 mt-12 max-w-2xl mx-auto">
+                      {/* Date */}
+                      <div className="text-center">
+                        <div className="border-t-2 border-gray-300 pt-2">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">Date of Issue</p>
+                        </div>
+                      </div>
+
+                      {/* Signature */}
+                      <div className="text-center">
+                        <div className="border-t-2 border-gray-300 pt-2">
+                          <p className="text-sm font-semibold text-gray-900">EventHub Platform</p>
+                          <p className="text-xs text-gray-600 mt-1">Authorized Signature</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Certificate ID */}
+                    <div className="mt-8 pt-6 border-t border-gray-200">
+                      <p className="text-xs text-gray-500">
+                        Certificate ID: CERT-{selectedEventForCert.id}-XXXX-XXXX
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Verify at: https://eventhub.com/verify
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Text */}
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900 mb-1">Informasi Template Sertifikat</p>
+                    <ul className="text-xs text-blue-700 space-y-1">
+                      <li>• Nama peserta akan otomatis terisi saat generate</li>
+                      <li>• Certificate ID unik akan digenerate untuk setiap peserta</li>
+                      <li>• Template ini akan digunakan untuk semua peserta yang attend event ini</li>
+                      <li>• Design profesional dengan border elegant dan ornamen sudut</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={() => setShowCertificatePreview(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all"
+                >
+                  Tutup
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCertificatePreview(false);
+                    handleGenerateCertificates(selectedEventForCert);
+                  }}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
+                >
+                  Generate Sertifikat Sekarang
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ show: false, id: null })}
+        onConfirm={confirmDelete}
+        title="Konfirmasi Hapus Event"
+        message="Apakah Anda yakin ingin menghapus event ini? Data yang sudah dihapus tidak dapat dikembalikan."
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        type="danger"
+      />
+
+      {/* Generate Certificates Confirmation Modal */}
+      <ConfirmModal
+        isOpen={generateConfirm.show}
+        onClose={() => setGenerateConfirm({ show: false, event: null })}
+        onConfirm={confirmGenerateCertificates}
+        title="Generate Sertifikat"
+        message={`Generate sertifikat untuk semua peserta yang telah attend event "${generateConfirm.event?.title}"?`}
+        confirmText="Ya, Generate"
+        cancelText="Batal"
+        type="info"
+      />
     </div>
   );
 };

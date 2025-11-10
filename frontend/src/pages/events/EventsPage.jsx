@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { eventsAPI, categoriesAPI } from '../../services/api';
-import ResponsiveNavbar from '../../components/ResponsiveNavbar';
 import { 
   Sparkles, 
   Laptop, 
@@ -192,7 +191,6 @@ const EventsPage = () => {
               <button onClick={() => navigate('/events')} className="font-poppins text-pink-400 font-semibold">Events</button>
               <button onClick={() => navigate('/blog')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Blog</button>
               <button onClick={() => navigate('/contact')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Contact</button>
-              <button onClick={() => navigate('/about')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">About</button>
             </div>
 
             {/* CTA Button */}
@@ -342,19 +340,20 @@ const EventsPage = () => {
               {filteredEvents.map((event, index) => (
                 <div key={event.id} onClick={() => navigate(`/events/${event.id}`)} className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-400 hover:shadow-xl transition-all group cursor-pointer animate-zoom-in" style={{animationDelay: `${index * 0.2}s`}}>
                   {/* Event Image */}
-                  <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative overflow-hidden">
-                    {event.image ? (
+                  <div className="h-48 bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center relative overflow-hidden">
+                    {event.image_url ? (
                       <img 
-                        src={event.image} 
+                        src={`http://localhost:3000${event.image_url}`}
                         alt={event.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                         onError={(e) => {
+                          console.error('Image failed to load:', event.image_url);
                           e.target.style.display = 'none';
                           e.target.nextSibling.style.display = 'flex';
                         }}
                       />
                     ) : null}
-                    <div className="text-6xl group-hover:scale-110 transition-transform" style={{display: event.image ? 'none' : 'flex'}}>
+                    <div className="text-6xl group-hover:scale-110 transition-transform" style={{display: event.image_url ? 'none' : 'flex'}}>
                       {getCategoryIcon(event.category_name)}
                     </div>
                     <div className="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition-all"></div>

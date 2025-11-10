@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar, Users, Ticket, BarChart3, Plus, FolderPlus, FileText } from 'lucide-react';
-import { eventsAPI, usersAPI, registrationsAPI, categoriesAPI } from '../../services/api';
+import { adminAPI, categoriesAPI } from '../../services/api';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalEvents: 0,
+    activeEvents: 0,
     totalUsers: 0,
     totalRegistrations: 0,
     totalCategories: 0,
@@ -21,23 +24,71 @@ const Dashboard = () => {
     try {
       setLoading(true);
       
+      // Fetch data with high limit to get accurate total counts from pagination
       const [eventsRes, usersRes, registrationsRes, categoriesRes] = await Promise.all([
-        eventsAPI.getAll({ limit: 5 }),
-        usersAPI.getAll({ limit: 5 }),
-        registrationsAPI.getAll({ limit: 5 }),
+        adminAPI.getAllEvents({ limit: 1000 }),
+        adminAPI.getAllUsers({ limit: 10000 }),
+        adminAPI.getAllRegistrations({ limit: 10000 }),
         categoriesAPI.getAll()
       ]);
 
+      // Extract data with proper null checks
+      // API response structure: { success, message, data: { events: [], pagination: { total: ... } } }
+      const eventsData = eventsRes.data || eventsRes;
+      const usersData = usersRes.data || usersRes;
+      const registrationsData = registrationsRes.data || registrationsRes;
+      const categoriesData = categoriesRes.data || categoriesRes;
+      
+      const allEvents = eventsData.events || [];
+      const allUsers = usersData.users || [];
+      const allRegistrations = registrationsData.registrations || [];
+      const allCategories = categoriesData.categories || [];
+      
+      // Use pagination totals for accurate counts (fallback to array length)
+      const totalEvents = eventsData.pagination?.total || allEvents.length;
+      const totalUsers = usersData.pagination?.total || allUsers.length;
+      const totalRegistrations = registrationsData.pagination?.total || allRegistrations.length;
+      const totalCategories = allCategories.length;
+      
+      console.log('🔍 Raw API Responses:', {
+        eventsRes,
+        usersRes,
+        registrationsRes,
+        categoriesRes
+      });
+      
+      // Calculate active events (published and upcoming)
+      const activeEvents = allEvents.filter(e => 
+        e.status === 'published' && 
+        e.status !== 'archived' &&
+        new Date(e.event_date) >= new Date()
+      );
+
+      // Sort events by date (most recent first) and take top 5 for display
+      const sortedEvents = [...allEvents].sort((a, b) => 
+        new Date(b.created_at || b.event_date) - new Date(a.created_at || a.event_date)
+      );
+
+      console.log('📊 Dashboard Stats:', {
+        totalEvents,
+        activeEvents: activeEvents.length,
+        totalUsers,
+        totalRegistrations,
+        totalCategories
+      });
+
       setStats({
-        totalEvents: eventsRes.data.total || eventsRes.data.events?.length || 0,
-        totalUsers: usersRes.data.total || usersRes.data.users?.length || 0,
-        totalRegistrations: registrationsRes.data.total || registrationsRes.data.registrations?.length || 0,
-        totalCategories: categoriesRes.data.categories?.length || 0,
-        recentEvents: eventsRes.data.events || [],
-        recentRegistrations: registrationsRes.data.registrations || []
+        totalEvents,
+        activeEvents: activeEvents.length,
+        totalUsers,
+        totalRegistrations,
+        totalCategories,
+        recentEvents: sortedEvents.slice(0, 5),
+        recentRegistrations: allRegistrations.slice(0, 5)
       });
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
+      console.error('Error details:', error.response?.data || error.message);
     } finally {
       setLoading(false);
     }
@@ -49,11 +100,6 @@ const Dashboard = () => {
         <div>
           <p className="text-gray-600 text-sm font-medium">{title}</p>
           <p className="text-3xl font-bold text-black">{value}</p>
-          {trend && (
-            <p className="text-green-600 text-sm mt-1">
-              ↗️ +{trend}% from last month
-            </p>
-          )}
         </div>
         <div className="text-4xl">
           {icon}
@@ -96,21 +142,31 @@ const Dashboard = () => {
           trend={12}
         />
         <StatCard
-          title="Active Users"
-          value={stats.totalUsers}
-          icon={<Users className="w-8 h-8 text-green-600" />}
+          title="Active Events"
+          value={stats.activeEvents}
+          icon={<Calendar className="w-8 h-8 text-green-600" />}
           trend={8}
+        />
+        <StatCard
+          title="Total Users"
+          value={stats.totalUsers}
+          icon={<Users className="w-8 h-8 text-purple-600" />}
+          trend={15}
         />
         <StatCard
           title="Registrations"
           value={stats.totalRegistrations}
-          icon="📝"
-          trend={15}
+          icon={<Ticket className="w-8 h-8 text-orange-600" />}
+          trend={10}
         />
+      </div>
+
+      {/* Secondary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <StatCard
           title="Categories"
           value={stats.totalCategories}
-          icon="📂"
+          icon={<FolderPlus className="w-8 h-8 text-pink-600" />}
           trend={5}
         />
       </div>
@@ -121,7 +177,10 @@ const Dashboard = () => {
         <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-black">Recent Events</h3>
-            <button className="text-blue-600 hover:text-blue-700 transition-colors">
+            <button 
+              onClick={() => navigate('/admin/events')}
+              className="text-blue-600 hover:text-blue-700 transition-colors font-medium"
+            >
               View All →
             </button>
           </div>
@@ -151,29 +210,41 @@ const Dashboard = () => {
         <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
           <h3 className="text-xl font-bold text-black mb-6">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-4">
-            <button className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
+            <button 
+              onClick={() => navigate('/admin/events')}
+              className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all border border-gray-200 group"
+            >
               <div className="flex justify-center mb-2">
-                <Calendar className="w-8 h-8 text-blue-600" />
+                <Calendar className="w-8 h-8 text-blue-600 group-hover:scale-110 transition-transform" />
               </div>
-              <div className="text-black font-medium">Create Event</div>
+              <div className="text-black font-medium group-hover:text-blue-600 transition-colors">Create Event</div>
             </button>
-            <button className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
+            <button 
+              onClick={() => navigate('/admin/users')}
+              className="p-4 bg-gray-50 rounded-lg hover:bg-green-50 hover:border-green-300 transition-all border border-gray-200 group"
+            >
               <div className="flex justify-center mb-2">
-                <Users className="w-8 h-8 text-green-600" />
+                <Users className="w-8 h-8 text-green-600 group-hover:scale-110 transition-transform" />
               </div>
-              <div className="text-black font-medium">Add User</div>
+              <div className="text-black font-medium group-hover:text-green-600 transition-colors">Add User</div>
             </button>
-            <button className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
+            <button 
+              onClick={() => navigate('/admin/categories')}
+              className="p-4 bg-gray-50 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all border border-gray-200 group"
+            >
               <div className="flex justify-center mb-2">
-                <FolderPlus className="w-8 h-8 text-purple-600" />
+                <FolderPlus className="w-8 h-8 text-purple-600 group-hover:scale-110 transition-transform" />
               </div>
-              <div className="text-black font-medium">New Category</div>
+              <div className="text-black font-medium group-hover:text-purple-600 transition-colors">New Category</div>
             </button>
-            <button className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
+            <button 
+              onClick={() => navigate('/admin/statistics')}
+              className="p-4 bg-gray-50 rounded-lg hover:bg-orange-50 hover:border-orange-300 transition-all border border-gray-200 group"
+            >
               <div className="flex justify-center mb-2">
-                <BarChart3 className="w-8 h-8 text-orange-600" />
+                <BarChart3 className="w-8 h-8 text-orange-600 group-hover:scale-110 transition-transform" />
               </div>
-              <div className="text-black font-medium">View Reports</div>
+              <div className="text-black font-medium group-hover:text-orange-600 transition-colors">View Reports</div>
             </button>
           </div>
         </div>

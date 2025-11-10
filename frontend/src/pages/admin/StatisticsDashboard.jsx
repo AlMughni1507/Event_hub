@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Calendar, Users, TrendingUp, BarChart3 } from 'lucide-react';
 import { analyticsAPI } from '../../services/api';
 import BarChart from '../../components/charts/BarChart';
 
@@ -122,7 +123,7 @@ const StatisticsDashboard = () => {
         <StatCard
           title={`Total Participants ${selectedYear}`}
           value={totalParticipants}
-          icon="👥"
+          icon={<Users className="w-8 h-8 text-green-400" />}
           color="text-green-400"
           subtitle="Attended events"
         />

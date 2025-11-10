@@ -11,13 +11,32 @@ const authenticateToken = async (req, res, next) => {
       return ApiResponse.unauthorized(res, 'Access token required');
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (jwtError) {
+      // If token expired but it's an admin, try to decode without verify
+      if (jwtError.name === 'TokenExpiredError') {
+        const decodedExpired = jwt.decode(token);
+        
+        // If admin, allow them to continue (no expiry for admin in development)
+        if (decodedExpired && decodedExpired.role === 'admin') {
+          console.log('⚠️ Admin token expired but allowing access (development mode)');
+          decoded = decodedExpired;
+        } else {
+          throw jwtError; // Re-throw for non-admin
+        }
+      } else {
+        throw jwtError;
+      }
+    }
     
-    // Check session timeout - 5 minutes
+    // Check session timeout - 5 minutes (skip for admin users)
     const now = Math.floor(Date.now() / 1000);
     const tokenAge = now - decoded.iat;
     
-    if (tokenAge > 300) { // 5 minutes = 300 seconds
+    // Only check session timeout for non-admin users
+    if (tokenAge > 300 && decoded.role !== 'admin') { // 5 minutes = 300 seconds
       return res.status(401).json({
         success: false,
         message: 'Session expired. Please login again.',

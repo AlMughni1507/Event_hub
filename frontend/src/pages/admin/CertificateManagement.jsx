@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmModal from '../../components/ConfirmModal';
+import { Award, Download, FileText, Eye, Settings } from 'lucide-react';
 import { eventsAPI, certificatesAPI, registrationsAPI } from '../../services/api';
 
 const CertificateManagement = () => {
+  const toast = useToast();
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [participants, setParticipants] = useState([]);
+  const [generateConfirm, setGenerateConfirm] = useState({ show: false, participant: null });
+  const [bulkGenerateConfirm, setBulkGenerateConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [certificateTemplate, setCertificateTemplate] = useState({
@@ -62,33 +68,42 @@ const CertificateManagement = () => {
     fetchParticipants(event.id);
   };
 
-  const generateCertificate = async (participant) => {
+  const generateCertificate = (participant) => {
+    setGenerateConfirm({ show: true, participant });
+  };
+
+  const confirmGenerate = async () => {
+    const participant = generateConfirm.participant;
     try {
       await certificatesAPI.generate(selectedEvent.id, participant.id);
-      alert(`Certificate generated for ${participant.full_name || participant.user_name}`);
+      toast.success(`Certificate generated for ${participant.full_name || participant.user_name}`);
     } catch (error) {
       console.error('Error generating certificate:', error);
-      alert('Failed to generate certificate');
+      toast.error('Failed to generate certificate');
     }
   };
 
-  const generateAllCertificates = async () => {
+  const generateAllCertificates = () => {
+    setBulkGenerateConfirm(true);
+  };
+
+  const confirmBulkGenerate = async () => {
     try {
       await certificatesAPI.generateBulk(selectedEvent.id);
-      alert(`Generated certificates for all ${participants.length} participants`);
+      toast.success(`Generated certificates for all ${participants.length} participants`);
     } catch (error) {
       console.error('Error generating bulk certificates:', error);
-      alert('Failed to generate certificates');
+      toast.error('Failed to generate certificates');
     }
   };
 
   const saveTemplate = async () => {
     try {
       await certificatesAPI.updateTemplate(certificateTemplate);
-      alert('Certificate template saved successfully');
+      toast.success('Certificate template saved successfully');
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Failed to save template');
+      toast.error('Failed to save template');
     }
   };
 
@@ -491,6 +506,30 @@ const CertificateManagement = () => {
           )}
         </div>
       </div>
+
+      {/* Generate Certificate Confirmation Modal */}
+      <ConfirmModal
+        isOpen={generateConfirm.show}
+        onClose={() => setGenerateConfirm({ show: false, participant: null })}
+        onConfirm={confirmGenerate}
+        title="Generate Certificate"
+        message={`Generate certificate untuk ${generateConfirm.participant?.full_name || generateConfirm.participant?.user_name}?`}
+        confirmText="Ya, Generate"
+        cancelText="Batal"
+        type="info"
+      />
+
+      {/* Bulk Generate Certificates Confirmation Modal */}
+      <ConfirmModal
+        isOpen={bulkGenerateConfirm}
+        onClose={() => setBulkGenerateConfirm(false)}
+        onConfirm={confirmBulkGenerate}
+        title="Bulk Generate Certificates"
+        message={`Generate certificates untuk semua ${participants.length} participants dari event "${selectedEvent?.title}"?`}
+        confirmText="Ya, Generate All"
+        cancelText="Batal"
+        type="warning"
+      />
     </div>
   );
 };

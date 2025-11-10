@@ -1,10 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import ConfirmModal from '../../components/ConfirmModal';
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  FolderKanban, 
+  Users, 
+  ClipboardList, 
+  TrendingUp, 
+  BarChart3, 
+  Award,
+  FileText,
+  MessageSquare,
+  LogOut,
+  Menu,
+  X,
+  Bell,
+  Settings
+} from 'lucide-react';
 
 const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -20,69 +39,80 @@ const AdminLayout = () => {
     navigate('/login');
   };
 
+  const confirmLogout = () => {
+    setShowLogoutModal(true);
+  };
+
   const menuItems = [
     {
       id: 'dashboard',
       label: 'Dashboard',
-      icon: '📊',
+      icon: LayoutDashboard,
       path: '/admin/dashboard',
       description: 'Overview & Analytics'
     },
     {
       id: 'events',
       label: 'Events',
-      icon: '🎪',
+      icon: Calendar,
       path: '/admin/events',
       description: 'Manage Events'
     },
     {
       id: 'categories',
       label: 'Categories',
-      icon: '📂',
+      icon: FolderKanban,
       path: '/admin/categories',
       description: 'Event Categories'
     },
     {
       id: 'users',
       label: 'Users',
-      icon: '👥',
+      icon: Users,
       path: '/admin/users',
       description: 'User Management'
     },
     {
       id: 'registrations',
       label: 'Registrations',
-      icon: '📝',
+      icon: ClipboardList,
       path: '/admin/registrations',
       description: 'Event Registrations'
     },
     {
       id: 'analytics',
       label: 'Analytics',
-      icon: '📈',
+      icon: TrendingUp,
       path: '/admin/analytics',
       description: 'Reports & Insights'
     },
     {
       id: 'statistics',
       label: 'Statistics',
-      icon: '📊',
+      icon: BarChart3,
       path: '/admin/statistics',
       description: 'Bar Charts & Data'
     },
     {
       id: 'certificates',
       label: 'Certificates',
-      icon: '🏆',
+      icon: Award,
       path: '/admin/certificates',
       description: 'Certificate Management'
     },
     {
       id: 'blogs',
       label: 'Blog Management',
-      icon: '📝',
+      icon: FileText,
       path: '/admin/blogs',
       description: 'Create & Manage Blogs'
+    },
+    {
+      id: 'reviews',
+      label: 'Reviews',
+      icon: MessageSquare,
+      path: '/admin/reviews',
+      description: 'User Reviews Management'
     }
   ];
 
@@ -105,9 +135,11 @@ const AdminLayout = () => {
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
               >
-                <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
+                {sidebarOpen ? (
+                  <X className="w-5 h-5 text-black" />
+                ) : (
+                  <Menu className="w-5 h-5 text-black" />
+                )}
               </button>
             </div>
           </div>
@@ -124,7 +156,7 @@ const AdminLayout = () => {
                     : 'hover:bg-gray-100 text-gray-700 hover:text-black'
                 }`}
               >
-                <span className="text-xl mr-3">{item.icon}</span>
+                <item.icon className={`w-5 h-5 mr-3 ${activeMenu === item.id ? 'text-white' : 'text-gray-600 group-hover:text-black'}`} />
                 <div className={`${sidebarOpen ? 'block' : 'hidden'} transition-all duration-300`}>
                   <div className="text-left">
                     <div className="font-medium">{item.label}</div>
@@ -150,10 +182,11 @@ const AdminLayout = () => {
                 </div>
               </div>
               <button
-                onClick={handleLogout}
-                className="w-full bg-black hover:bg-gray-800 text-white py-2 px-4 rounded-lg transition-colors"
+                onClick={confirmLogout}
+                className="w-full bg-black hover:bg-gray-800 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
               >
-                Logout
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
               </button>
             </div>
           </div>
@@ -188,9 +221,7 @@ const AdminLayout = () => {
 
                 {/* Notifications */}
                 <button className="relative p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors border border-gray-200">
-                  <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM10.07 2.82l3.12 3.12M7.05 5.84L3.93 2.72M2 12h4M20 12h4M7.05 18.16l3.12-3.12M17.95 18.16l-3.12-3.12" />
-                  </svg>
+                  <Bell className="w-6 h-6 text-black" />
                   <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
                 </button>
               </div>
@@ -199,10 +230,24 @@ const AdminLayout = () => {
 
           {/* Page Content */}
           <main className="p-6 bg-gray-50 min-h-screen">
-            <Outlet />
+            <div className="animate-fade-in">
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+        title="Konfirmasi Logout"
+        message="Apakah Anda yakin ingin keluar dari akun admin?"
+        confirmText="Ya, Logout"
+        cancelText="Batal"
+        type="danger"
+      />
     </div>
   );
 };

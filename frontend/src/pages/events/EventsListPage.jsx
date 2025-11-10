@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Search, Filter, Calendar, MapPin, Users, Tag } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
-import ResponsiveNavbar from '../../components/ResponsiveNavbar';
 import Footer from '../../components/Footer';
 
 const EventsListPage = () => {
@@ -85,8 +84,6 @@ const EventsListPage = () => {
         .font-bebas { font-family: 'Bebas Neue', cursive; }
         .font-poppins { font-family: 'Poppins', sans-serif; }
       `}</style>
-
-      <ResponsiveNavbar />
 
       {/* Hero Header */}
       <div className="relative bg-gradient-to-r from-purple-900 via-purple-800 to-pink-900 pt-24 pb-16">
