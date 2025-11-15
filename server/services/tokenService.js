@@ -69,7 +69,7 @@ class TokenService {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px;">
             <h1 style="color: white; margin: 0; font-size: 28px;">🎫 Token Daftar Hadir</h1>
-            <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">EventHub Platform</p>
+            <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Event Yukk Platform</p>
           </div>
           
           <div style="background: #f8f9fa; padding: 30px; border-radius: 10px; margin-bottom: 20px;">
@@ -96,7 +96,7 @@ class TokenService {
             <h4 style="color: #1976d2; margin-top: 0;">📋 Cara Menggunakan Token:</h4>
             <ol style="color: #666; padding-left: 20px;">
               <li>Hadir di lokasi event sesuai jadwal</li>
-              <li>Buka halaman daftar hadir di website EventHub</li>
+              <li>Buka halaman daftar hadir di website Event Yukk</li>
               <li>Masukkan token di atas untuk verifikasi</li>
               <li>Setelah verifikasi berhasil, sertifikat akan tersedia</li>
             </ol>
@@ -113,7 +113,7 @@ class TokenService {
 
           <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
             <p style="color: #999; font-size: 14px; margin: 0;">
-              Jika Anda memiliki pertanyaan, silakan hubungi tim support EventHub.
+              Jika Anda memiliki pertanyaan, silakan hubungi tim support Event Yukk.
             </p>
             <p style="color: #999; font-size: 12px; margin: 10px 0 0 0;">
               Email ini dikirim otomatis, harap tidak membalas.

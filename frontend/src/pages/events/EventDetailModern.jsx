@@ -13,6 +13,9 @@ const EventDetailModern = () => {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [performers, setPerformers] = useState([]);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [checkingRegistration, setCheckingRegistration] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
 
   useEffect(() => {
     fetchEventDetails();
@@ -22,13 +25,42 @@ const EventDetailModern = () => {
   const fetchEventDetails = async () => {
     try {
       const response = await api.get(`/events/${id}`);
-      setEvent(response.data.event || response.data);
+      const eventData = response.data.event || response.data;
+      setEvent(eventData);
+      setParticipantCount(eventData?.approved_registrations || 0);
     } catch (error) {
       console.error('Error fetching event:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const checkRegistration = async () => {
+      if (!event || !isAuthenticated || !user) {
+        setIsRegistered(false);
+        setCheckingRegistration(false);
+        return;
+      }
+
+      setCheckingRegistration(true);
+      try {
+        const response = await api.get(`/registrations/check/${event.id}`);
+        if (response.data?.success) {
+          setIsRegistered(response.data.data?.is_registered || false);
+        } else {
+          setIsRegistered(false);
+        }
+      } catch (error) {
+        console.error('Error checking registration:', error);
+        setIsRegistered(false);
+      } finally {
+        setCheckingRegistration(false);
+      }
+    };
+
+    checkRegistration();
+  }, [event, isAuthenticated, user]);
 
   const fetchPerformers = async () => {
     try {
@@ -41,22 +73,75 @@ const EventDetailModern = () => {
   };
 
   const handleRegister = async () => {
+    if (!event) return;
+
+    const isFreeEvent = event.is_free || event.price === 0 || event.registration_fee === 0;
+    const isFull =
+      event.max_participants &&
+      participantCount >= event.max_participants;
+
     if (!isAuthenticated) {
-      navigate('/login');
+      if (window.confirm('Anda harus login terlebih dahulu. Lanjutkan ke halaman login?')) {
+        navigate('/login', { state: { from: window.location.pathname } });
+      }
+      return;
+    }
+
+    if (isRegistered) {
+      alert('Anda sudah terdaftar pada event ini.');
+      return;
+    }
+
+    if (isFull) {
+      alert('Maaf, kuota peserta sudah penuh.');
+      return;
+    }
+
+    if (!window.confirm('Apakah Anda yakin ingin mendaftar event ini?')) {
       return;
     }
 
     setRegistering(true);
     try {
-      await api.post('/registrations', {
-        event_id: event.id,
-        user_id: user.id
-      });
-      alert('Registrasi berhasil!');
-      navigate('/settings');
+      const payload = isFreeEvent
+        ? {
+            event_id: event.id,
+            payment_method: 'free',
+            full_name: user?.full_name,
+            email: user?.email,
+            phone: user?.phone,
+          }
+        : {
+            event_id: event.id,
+            user_id: user.id,
+          };
+
+      const response = await api.post('/registrations', payload);
+      const success = response.data?.success !== false;
+
+      if (success) {
+        setIsRegistered(true);
+        setParticipantCount((prev) => prev + 1);
+        alert(
+          isFreeEvent
+            ? '✅ Pendaftaran berhasil! Token kehadiran telah dikirim ke email Anda.'
+            : 'Registrasi berhasil!'
+        );
+        fetchEventDetails();
+        if (!isFreeEvent) {
+          navigate('/settings');
+        }
+      } else {
+        throw new Error(response.data?.message || 'Gagal melakukan registrasi');
+      }
     } catch (error) {
       console.error('Error registering:', error);
-      alert(error.response?.data?.message || 'Gagal melakukan registrasi');
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Gagal melakukan registrasi. Silakan coba lagi.';
+      alert(errorMessage);
     } finally {
       setRegistering(false);
     }
@@ -101,6 +186,10 @@ const EventDetailModern = () => {
 
   const isPastEvent = new Date(event.event_date) < new Date();
   const price = event.is_free ? 0 : (event.price || 0);
+  const isFreeEvent = event.is_free || event.price === 0 || event.registration_fee === 0;
+  const isFull =
+    event.max_participants &&
+    participantCount >= event.max_participants;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -223,7 +312,7 @@ const EventDetailModern = () => {
               <div className="mb-6 pb-6 border-b border-gray-200">
                 <p className="text-sm text-gray-600 mb-1">Dibuat Oleh</p>
                 <p className="text-gray-900 font-medium">
-                  {event.organizer || 'EventHub Team'}
+                  {event.organizer || 'Event Yukk Team'}
                 </p>
               </div>
 
@@ -233,6 +322,13 @@ const EventDetailModern = () => {
                 <p className="text-2xl font-bold text-gray-900">
                   {event.is_free ? 'Gratis' : formatPrice(price)}
                 </p>
+                {event.max_participants ? (
+                  <p className="text-sm text-gray-600 mt-2">
+                    Kuota peserta: {participantCount} / {event.max_participants}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-600 mt-2">Total peserta: {participantCount}</p>
+                )}
               </div>
 
               {/* CTA Button */}
@@ -253,11 +349,27 @@ const EventDetailModern = () => {
               ) : (
                 <button
                   onClick={handleRegister}
-                  disabled={registering}
+                  disabled={registering || isRegistered || isFull || checkingRegistration}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {registering ? 'Processing...' : 'Beli Sekarang'}
+                  {checkingRegistration
+                    ? 'Memeriksa...'
+                    : registering
+                    ? 'Memproses...'
+                    : isRegistered
+                    ? 'Sudah Terdaftar'
+                    : isFull
+                    ? 'Kuota Penuh'
+                    : 'Beli Sekarang'}
                 </button>
+              )}
+
+              {(isRegistered || isFull) && (
+                <p className="mt-3 text-sm text-gray-600 text-center">
+                  {isFull
+                    ? 'Maaf, kuota peserta sudah terpenuhi.'
+                    : 'Anda sudah terdaftar pada event ini. Cek email Anda untuk detail selanjutnya.'}
+                </p>
               )}
 
               {/* Media Sosial */}

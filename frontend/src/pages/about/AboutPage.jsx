@@ -85,7 +85,7 @@ const AboutPage = () => {
               <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Calendar className="w-6 h-6 text-white" />
               </div>
-              <span className="font-bebas text-2xl text-white tracking-wider">EVENTHUB</span>
+              <span className="font-bebas text-2xl text-white tracking-wider">EVENT YUKK</span>
             </div>
 
             {/* Desktop Menu */}
@@ -133,7 +133,7 @@ const AboutPage = () => {
           <h2 className="font-bebas text-4xl md:text-5xl text-gray-800 mb-6">OUR STORY</h2>
           <div className="max-w-3xl mx-auto">
             <p className="font-poppins text-lg text-gray-600 leading-relaxed mb-6">
-              EventHub was born from a simple idea: to make discovering and attending events easier and more enjoyable for everyone. 
+              Event Yukk was born from a simple idea: to make discovering and attending events easier and more enjoyable for everyone. 
               We believe that events have the power to bring people together, create lasting memories, and build stronger communities.
             </p>
             <p className="font-poppins text-lg text-gray-600 leading-relaxed">
@@ -219,7 +219,7 @@ const AboutPage = () => {
         <div className="mt-20 text-center">
           <h2 className="font-bebas text-4xl md:text-5xl text-gray-800 mb-6">JOIN US TODAY</h2>
           <p className="font-poppins text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-            Start discovering amazing events or create your own. Join thousands of users who trust EventHub for their event needs.
+            Start discovering amazing events or create your own. Join thousands of users who trust Event Yukk for their event needs.
           </p>
           <div className="flex gap-4 justify-center">
             <button 

@@ -161,7 +161,7 @@ export const certificatesAPI = {
 
 // Blogs API
 export const blogsAPI = {
-  getAll: () => api.get('/blogs'),
+  getAll: (params) => api.get('/blogs', { params }),
   getById: (id) => api.get(`/blogs/${id}`),
   create: (data) => api.post('/blogs', data),
   update: (id, data) => api.put(`/blogs/${id}`, data),
@@ -184,6 +184,23 @@ export const attendanceAPI = {
   submitAttendance: (data) => api.post('/attendance/submit', data),
   getEventAttendance: (eventId) => api.get(`/attendance/event/${eventId}`),
   getAttendanceStats: (eventId) => api.get(`/attendance/stats/${eventId}`),
+};
+
+// Contacts API
+export const contactsAPI = {
+  getAll: (params) => api.get('/contacts', { params }),
+  getById: (id) => api.get(`/contacts/${id}`),
+  updateStatus: (id, status) => api.patch(`/contacts/${id}/status`, { status }),
+  reply: (id, replyMessage) => api.post(`/contacts/${id}/reply`, { reply_message: replyMessage }),
+};
+
+// Reviews API
+export const reviewsAPI = {
+  getAll: (params) => api.get('/reviews', { params }),
+  getById: (id) => api.get(`/reviews/${id}`),
+  create: (data) => api.post('/reviews', data),
+  update: (id, data) => api.put(`/reviews/${id}`, data),
+  delete: (id) => api.delete(`/reviews/${id}`),
 };
 
 export default api;

@@ -141,7 +141,7 @@ router.get('/:id', async (req, res) => {
 
     const [events] = await query(
       `SELECT e.*, c.name as category_name, e.image as image_url,
-              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
+              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        WHERE e.id = ? ${!isAdmin ? 'AND e.is_active = 1 AND e.status != \'archived\'' : ''}`,
@@ -176,6 +176,23 @@ router.post('/', authenticateToken, requireUser, upload.single('image'), async (
     
     if (eventDate < now) {
       return ApiResponse.badRequest(res, 'Event date cannot be in the past');
+    }
+
+    // Validate H-3 rule: Admin can only create events minimum 3 days in advance
+    const minAdvanceDays = 3;
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() + minAdvanceDays);
+    minDate.setHours(0, 0, 0, 0); // Set to start of day
+    
+    const eventDateOnly = new Date(event_date);
+    eventDateOnly.setHours(0, 0, 0, 0);
+    
+    if (eventDateOnly < minDate) {
+      return ApiResponse.badRequest(
+        res, 
+        `Event hanya dapat dibuat minimal ${minAdvanceDays} hari sebelum tanggal event (H-${minAdvanceDays}). ` +
+        `Tanggal event paling awal yang bisa dibuat: ${minDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`
+      );
     }
 
     // Check if category exists
@@ -269,12 +286,60 @@ router.put('/:id', authenticateToken, requireUser, upload.single('image'), async
 
     console.log('Validated required fields:', { title, description, category_id, event_date, event_time, location });
 
+    // Validate H-3 rule if event_date is being changed
+    if (req.body.event_date && req.body.event_date !== existingEvent.event_date) {
+      const minAdvanceDays = 3;
+      const minDate = new Date();
+      minDate.setDate(minDate.getDate() + minAdvanceDays);
+      minDate.setHours(0, 0, 0, 0);
+      
+      const newEventDate = new Date(event_date);
+      newEventDate.setHours(0, 0, 0, 0);
+      
+      if (newEventDate < minDate) {
+        return ApiResponse.badRequest(
+          res,
+          `Event hanya dapat dijadwalkan minimal ${minAdvanceDays} hari dari sekarang (H-${minAdvanceDays}). ` +
+          `Tanggal event paling awal: ${minDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`
+        );
+      }
+    }
+
+    const parseBooleanField = (value, fallback) => {
+      if (value === undefined || value === null) {
+        return fallback;
+      }
+
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (['true', '1', 'yes', 'on'].includes(normalized)) return 1;
+        if (['false', '0', 'no', 'off'].includes(normalized)) return 0;
+      }
+
+      if (typeof value === 'number') {
+        return value ? 1 : 0;
+      }
+
+      if (typeof value === 'boolean') {
+        return value ? 1 : 0;
+      }
+
+      return fallback;
+    };
+
     // Get new image path if uploaded, otherwise keep existing
     const imagePath = req.file 
       ? `/uploads/events/${req.file.filename}` 
       : existingEvent.image;
 
-    // Build update data with fallbacks to existing values
+    const parsedMaxParticipants = parseInt(
+      req.body.max_participants !== undefined ? req.body.max_participants : existingEvent.max_participants || 50,
+      10
+    );
+    const parsedPrice = parseFloat(
+      req.body.price !== undefined ? req.body.price : existingEvent.price || 0
+    );
+
     const updateData = {
       title,
       description,
@@ -287,18 +352,16 @@ router.put('/:id', authenticateToken, requireUser, upload.single('image'), async
       address: req.body.address || existingEvent.address || location,
       city: req.body.city || existingEvent.city || 'Jakarta',
       province: req.body.province || existingEvent.province || 'DKI Jakarta',
-      category_id: parseInt(category_id),
-      max_participants: parseInt(req.body.max_participants || existingEvent.max_participants || 50),
-      price: parseFloat(req.body.price || existingEvent.price || 0),
-      is_free: (req.body.is_free === 'true' || req.body.is_free === true || req.body.is_free === 1) ? 1 : 0,
+      category_id: parseInt(category_id, 10),
+      max_participants: Number.isNaN(parsedMaxParticipants) ? existingEvent.max_participants || 50 : parsedMaxParticipants,
+      price: Number.isNaN(parsedPrice) ? existingEvent.price || 0 : parsedPrice,
+      is_free: parseBooleanField(req.body.is_free, existingEvent.is_free),
       image: imagePath,
       image_aspect_ratio: req.body.image_aspect_ratio || existingEvent.image_aspect_ratio || '16:9',
       // IMPORTANT: Keep existing status if not explicitly provided
       status: req.body.status || existingEvent.status || 'published',
       // IMPORTANT: Keep existing is_active if not explicitly provided (prevent auto-deactivation!)
-      is_active: req.body.is_active !== undefined 
-        ? ((req.body.is_active === 'true' || req.body.is_active === true || req.body.is_active === 1) ? 1 : 0)
-        : existingEvent.is_active  // FALLBACK to existing value if undefined
+      is_active: parseBooleanField(req.body.is_active, existingEvent.is_active)
     };
 
     console.log('Final update data:', updateData);
@@ -436,7 +499,7 @@ router.get('/upcoming/events', async (req, res) => {
 
     const [events] = await query(
       `SELECT e.*, c.name as category_name,
-              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
+              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        WHERE e.is_active = 1 AND e.event_date > NOW()
@@ -475,7 +538,7 @@ router.get('/category/:categoryId', async (req, res) => {
     // Get events
     const [events] = await query(
       `SELECT e.*, c.name as category_name,
-              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
+              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        WHERE e.category_id = ? AND e.is_active = 1
@@ -524,7 +587,7 @@ router.get('/search/events', async (req, res) => {
     // Get events
     const [events] = await query(
       `SELECT e.*, c.name as category_name,
-              (SELECT COUNT(*) FROM registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
+              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
        WHERE e.is_active = 1 AND 

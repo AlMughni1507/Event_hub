@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, Users, Clock, ArrowRight, Ticket, Star, UserCircle2, Music, Code, Briefcase, Dumbbell, GraduationCap, Palette, Utensils, HeartPulse, Wrench, Mic, BarChart3, PartyPopper, Drama, Gamepad2, Shirt, Plane, Microscope, Heart } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { FadeInUp, FadeInLeft, FadeInRight, ScaleIn, StaggerContainer, StaggerItem, HoverScale } from '../../components/ScrollAnimation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FadeInUp, FadeInLeft, FadeInRight, ScaleIn, StaggerContainer, StaggerItem, HoverScale, RevealOnScroll, RotateIn } from '../../components/ScrollAnimation';
 import { useAuth } from '../../contexts/AuthContext';
 import { eventsAPI } from '../../services/api';
 import api from '../../services/api';
@@ -126,31 +126,43 @@ const HomePage = () => {
         const highlightedResponse = await fetch('http://localhost:3000/api/events/highlighted/event');
         const highlightedData = await highlightedResponse.json();
         
-        console.log('Highlighted event response:', highlightedData);
-        console.log('Image URL:', highlightedData.data?.image_url);
+        console.log('✅ Highlighted event response:', highlightedData);
         
         if (highlightedData.success && highlightedData.data && isMounted) {
           setFeaturedEvent(highlightedData.data);
+          console.log('✅ Featured event set:', highlightedData.data.title);
           
           // Extract color from event image
           if (highlightedData.data.image_url) {
             const imageUrl = `http://localhost:3000${highlightedData.data.image_url}`;
             extractDominantColor(imageUrl);
           }
+        } else {
+          console.log('⚠️ No highlighted event found, will use first upcoming event');
         }
         
         // Fetch upcoming events for sections below
         const response = await eventsAPI.getAll({ limit: 20, status: 'published' });
         const events = response?.data?.events || [];
         
-        console.log('All events:', events);
-        console.log('Total events fetched:', events.length);
+        console.log('✅ All events fetched:', events.length);
+        
+        // If no featured event was set, use the first event as featured
+        if (!highlightedData.data && events.length > 0 && isMounted) {
+          console.log('📌 Setting first event as featured:', events[0].title);
+          setFeaturedEvent(events[0]);
+          
+          // Extract color from event image
+          if (events[0].image_url || events[0].image) {
+            const imageUrl = `http://localhost:3000${events[0].image_url || events[0].image}`;
+            extractDominantColor(imageUrl);
+          }
+        }
         
         // Get all active events (include highlighted event in regular sections)
         const allActiveEvents = events;
         
-        console.log('Active events for sections:', allActiveEvents);
-        console.log('Active events count:', allActiveEvents.length);
+        console.log('✅ Active events for sections:', allActiveEvents.length);
         
         if (isMounted) {
           setUpcomingEvents(allActiveEvents);
@@ -362,45 +374,91 @@ const HomePage = () => {
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-              <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <motion.div 
+                className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
                 <Calendar className="w-6 h-6 text-white" />
-              </div>
-              <span className="font-bebas text-2xl text-white tracking-wider">EVENTHUB</span>
+              </motion.div>
+              <motion.span 
+                className="font-bebas text-2xl text-white tracking-wider"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                EVENT YUKK
+              </motion.span>
             </div>
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-8">
-              <button onClick={() => navigate('/')} className="font-poppins text-pink-400 font-semibold">Home</button>
-              <button onClick={() => navigate('/events')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Events</button>
-              <button onClick={() => navigate('/blog')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Blog</button>
-              <button onClick={() => navigate('/contact')} className="font-poppins text-white hover:text-pink-400 transition-colors font-medium">Contact</button>
+              <motion.button 
+                onClick={() => navigate('/')} 
+                className="font-poppins text-pink-400 font-semibold"
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+              >
+                Home
+              </motion.button>
+              <motion.button 
+                onClick={() => navigate('/events')} 
+                className="font-poppins text-white hover:text-pink-400 transition-colors font-medium"
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+              >
+                Events
+              </motion.button>
+              <motion.button 
+                onClick={() => navigate('/blog')} 
+                className="font-poppins text-white hover:text-pink-400 transition-colors font-medium"
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+              >
+                Blog
+              </motion.button>
+              <motion.button 
+                onClick={() => navigate('/contact')} 
+                className="font-poppins text-white hover:text-pink-400 transition-colors font-medium"
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+              >
+                Contact
+              </motion.button>
             </div>
 
             {/* CTA Button or Profile Icon */}
             <div className="flex items-center gap-4">
               {isAuthenticated ? (
-                <button 
+                <motion.button 
                   onClick={() => navigate('/settings')}
                   className="hidden md:flex items-center gap-2 font-poppins px-5 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <UserCircle2 className="w-5 h-5" />
                   <span>{user?.full_name || user?.username || 'Profile'}</span>
-                </button>
+                </motion.button>
               ) : (
-                <button 
+                <motion.button 
                   onClick={() => navigate('/login')}
                   className="hidden md:block font-poppins px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   Get Started
-                </button>
+                </motion.button>
               )}
               
               {/* Mobile Menu Button */}
-              <button className="md:hidden text-white">
+              <motion.button 
+                className="md:hidden text-white"
+                whileTap={{ scale: 0.9 }}
+              >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>
@@ -410,16 +468,23 @@ const HomePage = () => {
       <section className="relative pt-40 pb-32 min-h-screen flex items-center overflow-hidden">
         {/* Background Image with Overlay */}
         <div className="absolute inset-0">
-          <div 
+          <motion.div 
             className="absolute inset-0 bg-cover bg-center"
             style={{
               backgroundImage: featuredEvent?.image_url 
                 ? `url(http://localhost:3000${featuredEvent.image_url})`
                 : 'url(https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1920&h=1080&fit=crop)',
             }}
-          ></div>
+            initial={{ scale: 1.1, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ 
+              duration: 1.5, 
+              ease: [0.25, 0.1, 0.25, 1],
+              opacity: { duration: 1 }
+            }}
+          ></motion.div>
           {/* Dynamic gradient overlay based on image color */}
-          <div 
+          <motion.div 
             className="absolute inset-0 transition-all duration-1000"
             style={{
               background: `linear-gradient(to bottom, 
@@ -428,20 +493,54 @@ const HomePage = () => {
                 rgba(${dominantColor.r * 0.8}, ${dominantColor.g * 0.8}, ${dominantColor.b * 0.8}, 0.85)
               )`
             }}
-          ></div>
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.2, delay: 0.3 }}
+          ></motion.div>
         </div>
 
         {/* Content - Large & Prominent */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           {loading ? (
             <div className="text-center text-white py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mx-auto"></div>
-              <p className="mt-4 font-poppins">Loading...</p>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+                className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mx-auto mb-4"
+              ></motion.div>
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                className="mt-4 font-poppins"
+              >
+                Loading amazing events...
+              </motion.p>
             </div>
           ) : featuredEvent ? (
-            <div className="flex flex-col lg:flex-row items-center gap-16">
+            <motion.div 
+              className="flex flex-col lg:flex-row items-center gap-16"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ 
+                duration: 1, 
+                ease: [0.25, 0.1, 0.25, 1],
+                y: { type: "spring", stiffness: 100, damping: 15 }
+              }}
+            >
               {/* Left: Event Image Card */}
-              <div className="w-full lg:w-1/2">
+              <motion.div 
+                className="w-full lg:w-1/2"
+                initial={{ opacity: 0, x: -80, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                transition={{ 
+                  delay: 0.3, 
+                  duration: 0.9,
+                  ease: [0.25, 0.1, 0.25, 1],
+                  scale: { type: "spring", stiffness: 200, damping: 20 }
+                }}
+              >
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl group">
                   {featuredEvent.image_url ? (
                     <img 
@@ -465,27 +564,72 @@ const HomePage = () => {
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                   {/* Highlight Badge */}
-                  <div className="absolute top-6 left-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-3 rounded-full font-poppins font-bold text-base flex items-center gap-2 shadow-2xl">
+                  <motion.div 
+                    className="absolute top-6 left-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-3 rounded-full font-poppins font-bold text-base flex items-center gap-2 shadow-2xl"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+                  >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                     </svg>
                     Featured Event
-                  </div>
+                  </motion.div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Right: Event Info */}
-              <div className="w-full lg:w-1/2 text-white">
-                <h1 className="font-bebas text-6xl md:text-7xl lg:text-8xl font-black mb-6 leading-tight">
+              <motion.div 
+                className="w-full lg:w-1/2 text-white"
+                initial={{ opacity: 0, x: 80, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                transition={{ 
+                  delay: 0.5, 
+                  duration: 0.9,
+                  ease: [0.25, 0.1, 0.25, 1],
+                  scale: { type: "spring", stiffness: 200, damping: 20 }
+                }}
+              >
+                <motion.h1 
+                  className="font-bebas text-6xl md:text-7xl lg:text-8xl font-black mb-6 leading-tight animate-welcome-fade-in animate-welcome-glow"
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 0.7, 
+                    duration: 1,
+                    ease: [0.25, 0.1, 0.25, 1],
+                    y: { type: "spring", stiffness: 150, damping: 20 }
+                  }}
+                >
                   {featuredEvent.title}
-                </h1>
+                </motion.h1>
                 
-                <p className="font-poppins text-gray-300 text-xl mb-8 line-clamp-3">
+                <motion.p 
+                  className="font-poppins text-gray-300 text-xl mb-8 line-clamp-3 animate-fadeInUp"
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 0.9, 
+                    duration: 0.9,
+                    ease: [0.25, 0.1, 0.25, 1]
+                  }}
+                >
                   {featuredEvent.short_description || featuredEvent.description}
-                </p>
+                </motion.p>
 
                 {/* Countdown - Large */}
-                <div className="flex gap-4 mb-8">
+                <motion.div 
+                  className="flex gap-4 mb-8 animate-slide-in-bounce"
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 1.1, 
+                    duration: 1,
+                    type: "spring", 
+                    stiffness: 200, 
+                    damping: 25 
+                  }}
+                >
                   <div className="bg-black/40 backdrop-blur-md rounded-xl p-5 flex-1 border border-pink-500/30">
                     <div className="font-bebas text-5xl font-black text-pink-400">{countdown.days}</div>
                     <div className="font-poppins text-sm text-white/80">Days</div>
@@ -502,10 +646,19 @@ const HomePage = () => {
                     <div className="font-bebas text-5xl font-black text-pink-400">{countdown.seconds}</div>
                     <div className="font-poppins text-sm text-white/80">Sec</div>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Event Details - Large */}
-                <div className="flex flex-wrap gap-4 mb-8 font-poppins text-base">
+                <motion.div 
+                  className="flex flex-wrap gap-4 mb-8 font-poppins text-base animate-fadeInUp"
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 1.3, 
+                    duration: 0.9,
+                    ease: [0.25, 0.1, 0.25, 1]
+                  }}
+                >
                   <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-5 py-3 rounded-lg">
                     <Calendar className="w-5 h-5 text-pink-400" />
                     <span>{new Date(featuredEvent.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
@@ -518,33 +671,54 @@ const HomePage = () => {
                     <Users className="w-5 h-5 text-pink-400" />
                     <span>{featuredEvent.approved_registrations || 0} / {featuredEvent.max_participants}</span>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* CTA Button - Large */}
-                <button
+                <motion.button
                   onClick={() => navigate(`/events/${featuredEvent.id}`)}
-                  className="group bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-poppins font-bold py-5 px-10 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-2xl inline-flex items-center gap-3"
+                  className="group bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-poppins font-bold py-5 px-10 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-2xl inline-flex items-center gap-3 animate-pulse-glow"
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 1.5, 
+                    duration: 1,
+                    type: "spring", 
+                    stiffness: 250, 
+                    damping: 20 
+                  }}
                 >
                   <Ticket className="w-6 h-6" />
                   Register Now
                   <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </div>
+                </motion.button>
+              </motion.div>
+            </motion.div>
           ) : (
-            <div className="text-center text-white">
+            <motion.div 
+              className="text-center text-white"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+            >
               <h1 className="text-6xl font-bold mb-6">No Featured Events</h1>
               <p className="text-xl text-pink-200">Check back soon for upcoming events!</p>
-            </div>
+            </motion.div>
           )}
         </div>
 
         {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce z-20">
+        <motion.div 
+          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce z-20"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.5, duration: 0.8 }}
+        >
           <div className="w-6 h-10 border-2 border-white/50 rounded-full flex justify-center">
             <div className="w-1 h-3 bg-white/50 rounded-full mt-2 animate-pulse"></div>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* Smooth Fade Transition from Hero to How to Join */}
@@ -573,7 +747,7 @@ const HomePage = () => {
         {/* Animated Background Gradient Orbs */}
         <div className="absolute inset-0 overflow-hidden opacity-40">
           {[...Array(8)].map((_, i) => (
-            <div
+            <motion.div
               key={i}
               className="absolute rounded-full blur-3xl"
               style={{
@@ -582,8 +756,15 @@ const HomePage = () => {
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
                 background: `radial-gradient(circle, ${['rgba(168, 85, 247, 0.2)', 'rgba(236, 72, 153, 0.2)', 'rgba(59, 130, 246, 0.2)'][i % 3]}, transparent)`,
-                animation: `float ${Math.random() * 15 + 10}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 5}s`
+              }}
+              animate={{
+                x: [0, (Math.random() - 0.5) * 100, 0],
+                y: [0, (Math.random() - 0.5) * 100, 0],
+              }}
+              transition={{
+                duration: Math.random() * 10 + 10,
+                repeat: Infinity,
+                repeatType: "reverse"
               }}
             />
           ))}
@@ -593,11 +774,14 @@ const HomePage = () => {
           {/* Header */}
           <FadeInUp>
             <div className="text-center mb-20">
-              <div className="inline-block mb-4 animate-bounce">
+              <motion.div 
+                className="inline-block mb-4 animate-bounce"
+                whileHover={{ scale: 1.1 }}
+              >
                 <span className="bg-gradient-to-r from-pink-500 via-purple-600 to-blue-500 text-white px-6 py-2 rounded-full text-sm font-poppins font-bold shadow-lg">
                   🚀 GETTING STARTED
                 </span>
-              </div>
+              </motion.div>
               <h2 className="font-bebas text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 mb-6 tracking-tight">
                 How to Join Event
               </h2>
@@ -633,24 +817,44 @@ const HomePage = () => {
                   <div className="pulse-ring absolute inset-0 rounded-full bg-green-400"></div>
                   
                   {/* Main Circle */}
-                  <div className="relative w-28 h-28 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                  <motion.div 
+                    className="relative w-28 h-28 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500"
+                    whileHover={{ scale: 1.1, rotate: 6 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
                     <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                     
                     {/* Sparkles */}
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className="sparkle absolute w-2 h-2 bg-yellow-300 rounded-full" style={{
-                        top: ['10%', '90%', '10%', '90%'][i],
-                        left: ['10%', '10%', '90%', '90%'][i]
-                      }}></div>
+                      <motion.div 
+                        key={i} 
+                        className="sparkle absolute w-2 h-2 bg-yellow-300 rounded-full" 
+                        style={{
+                          top: ['10%', '90%', '10%', '90%'][i],
+                          left: ['10%', '10%', '90%', '90%'][i]
+                        }}
+                        animate={{ 
+                          scale: [0, 1, 0],
+                          opacity: [0, 1, 0]
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          delay: i * 0.2
+                        }}
+                      ></motion.div>
                     ))}
-                  </div>
+                  </motion.div>
                   
                   {/* Step Number Badge */}
-                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300">
+                  <motion.div 
+                    className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300"
+                    whileHover={{ scale: 1.25 }}
+                  >
                     1
-                  </div>
+                  </motion.div>
                 </div>
                 <h3 className="font-poppins text-xl font-black text-gray-900 mb-2 uppercase tracking-wide group-hover:text-green-600 transition-colors">Login</h3>
                 <p className="font-poppins text-sm text-gray-600 leading-relaxed">Create account or sign in to get started</p>
@@ -669,15 +873,37 @@ const HomePage = () => {
               <div className="text-center">
                 <div className="relative inline-block mb-6">
                   <div className="pulse-ring absolute inset-0 rounded-full bg-blue-400"></div>
-                  <div className="relative w-28 h-28 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                  <motion.div 
+                    className="relative w-28 h-28 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500"
+                    whileHover={{ scale: 1.1, rotate: 6 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
                     <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className="sparkle absolute w-2 h-2 bg-yellow-300 rounded-full" style={{ top: ['10%', '90%', '10%', '90%'][i], left: ['10%', '10%', '90%', '90%'][i] }}></div>
+                      <motion.div 
+                        key={i} 
+                        className="sparkle absolute w-2 h-2 bg-yellow-300 rounded-full" 
+                        style={{ top: ['10%', '90%', '10%', '90%'][i], left: ['10%', '10%', '90%', '90%'][i] }}
+                        animate={{ 
+                          scale: [0, 1, 0],
+                          opacity: [0, 1, 0]
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          delay: i * 0.2
+                        }}
+                      ></motion.div>
                     ))}
-                  </div>
-                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300">2</div>
+                  </motion.div>
+                  <motion.div 
+                    className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300"
+                    whileHover={{ scale: 1.25 }}
+                  >
+                    2
+                  </motion.div>
                 </div>
                 <h3 className="font-poppins text-xl font-black text-gray-900 mb-2 uppercase tracking-wide group-hover:text-blue-600 transition-colors">Find Event</h3>
                 <p className="font-poppins text-sm text-gray-600 leading-relaxed">Browse and discover events you love</p>
@@ -695,13 +921,35 @@ const HomePage = () => {
               <div className="text-center">
                 <div className="relative inline-block mb-6">
                   <div className="pulse-ring absolute inset-0 rounded-full bg-purple-400"></div>
-                  <div className="relative w-28 h-28 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                  <motion.div 
+                    className="relative w-28 h-28 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500"
+                    whileHover={{ scale: 1.1, rotate: 6 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
                     <Ticket className="w-14 h-14 text-white" />
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className="sparkle absolute w-2 h-2 bg-yellow-300 rounded-full" style={{ top: ['10%', '90%', '10%', '90%'][i], left: ['10%', '10%', '90%', '90%'][i] }}></div>
+                      <motion.div 
+                        key={i} 
+                        className="sparkle absolute w-2 h-2 bg-yellow-300 rounded-full" 
+                        style={{ top: ['10%', '90%', '10%', '90%'][i], left: ['10%', '10%', '90%', '90%'][i] }}
+                        animate={{ 
+                          scale: [0, 1, 0],
+                          opacity: [0, 1, 0]
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          delay: i * 0.2
+                        }}
+                      ></motion.div>
                     ))}
-                  </div>
-                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300">3</div>
+                  </motion.div>
+                  <motion.div 
+                    className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300"
+                    whileHover={{ scale: 1.25 }}
+                  >
+                    3
+                  </motion.div>
                 </div>
                 <h3 className="font-poppins text-xl font-black text-gray-900 mb-2 uppercase tracking-wide group-hover:text-purple-600 transition-colors">Buy Ticket</h3>
                 <p className="font-poppins text-sm text-gray-600 leading-relaxed">Secure your spot with easy payment</p>
@@ -719,15 +967,37 @@ const HomePage = () => {
               <div className="text-center">
                 <div className="relative inline-block mb-6">
                   <div className="pulse-ring absolute inset-0 rounded-full bg-pink-400"></div>
-                  <div className="relative w-28 h-28 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                  <motion.div 
+                    className="relative w-28 h-28 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500"
+                    whileHover={{ scale: 1.1, rotate: 6 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
                     <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className="sparkle absolute w-2 h-2 bg-yellow-300 rounded-full" style={{ top: ['10%', '90%', '10%', '90%'][i], left: ['10%', '10%', '90%', '90%'][i] }}></div>
+                      <motion.div 
+                        key={i} 
+                        className="sparkle absolute w-2 h-2 bg-yellow-300 rounded-full" 
+                        style={{ top: ['10%', '90%', '10%', '90%'][i], left: ['10%', '10%', '90%', '90%'][i] }}
+                        animate={{ 
+                          scale: [0, 1, 0],
+                          opacity: [0, 1, 0]
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          delay: i * 0.2
+                        }}
+                      ></motion.div>
                     ))}
-                  </div>
-                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-pink-500 to-pink-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300">4</div>
+                  </motion.div>
+                  <motion.div 
+                    className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-pink-500 to-pink-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300"
+                    whileHover={{ scale: 1.25 }}
+                  >
+                    4
+                  </motion.div>
                 </div>
                 <h3 className="font-poppins text-xl font-black text-gray-900 mb-2 uppercase tracking-wide group-hover:text-pink-600 transition-colors">Enjoy Event</h3>
                 <p className="font-poppins text-sm text-gray-600 leading-relaxed">Have an amazing experience</p>
@@ -745,15 +1015,37 @@ const HomePage = () => {
               <div className="text-center">
                 <div className="relative inline-block mb-6">
                   <div className="pulse-ring absolute inset-0 rounded-full bg-yellow-400"></div>
-                  <div className="relative w-28 h-28 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                  <motion.div 
+                    className="relative w-28 h-28 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500"
+                    whileHover={{ scale: 1.1, rotate: 6 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
                     <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                     </svg>
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className="sparkle absolute w-2 h-2 bg-white rounded-full" style={{ top: ['10%', '90%', '10%', '90%'][i], left: ['10%', '10%', '90%', '90%'][i] }}></div>
+                      <motion.div 
+                        key={i} 
+                        className="sparkle absolute w-2 h-2 bg-white rounded-full" 
+                        style={{ top: ['10%', '90%', '10%', '90%'][i], left: ['10%', '10%', '90%', '90%'][i] }}
+                        animate={{ 
+                          scale: [0, 1, 0],
+                          opacity: [0, 1, 0]
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          delay: i * 0.2
+                        }}
+                      ></motion.div>
                     ))}
-                  </div>
-                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300">5</div>
+                  </motion.div>
+                  <motion.div 
+                    className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-full flex items-center justify-center font-bebas text-2xl text-white shadow-xl group-hover:scale-125 transition-transform duration-300"
+                    whileHover={{ scale: 1.25 }}
+                  >
+                    5
+                  </motion.div>
                 </div>
                 <h3 className="font-poppins text-xl font-black text-gray-900 mb-2 uppercase tracking-wide group-hover:text-yellow-600 transition-colors">Get Certificate</h3>
                 <p className="font-poppins text-sm text-gray-600 leading-relaxed">Receive your achievement certificate</p>
@@ -766,13 +1058,15 @@ const HomePage = () => {
 
           {/* CTA */}
           <div className="text-center mt-12">
-            <button
+            <motion.button
               onClick={() => navigate('/events')}
               className="group inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-poppins font-bold text-base shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+              whileHover={{ scale: 1.05, y: -3 }}
+              whileTap={{ scale: 0.95 }}
             >
               <span>Start Your Journey</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -830,10 +1124,15 @@ const HomePage = () => {
                 ];
                 
                 return (
-              <div
+              <motion.div
                 key={event.id}
                 className={`group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer ${gridClasses[index] || 'md:col-span-3'}`}
                 onClick={() => navigate(`/events/${event.id}`)}
+                whileHover={{ y: -10, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1, duration: 0.5 }}
               >
                 <div className="relative h-72 overflow-hidden">
                   <img
@@ -869,7 +1168,7 @@ const HomePage = () => {
                     </span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
                 );
               })}
             </div>
@@ -898,9 +1197,13 @@ const HomePage = () => {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
             <div className="flex-1">
               <div className="flex items-start gap-4 mb-4">
-                <div className="p-3 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl">
+                <motion.div 
+                  className="p-3 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
                   <Star className="w-8 h-8 text-white" />
-                </div>
+                </motion.div>
                 <div>
                   <h2 className="font-bebas text-5xl md:text-6xl font-bold text-gray-800 leading-tight">
                     Featured<br/>Events
@@ -909,21 +1212,29 @@ const HomePage = () => {
                 </div>
               </div>
             </div>
-            <button 
+            <motion.button 
               onClick={() => navigate('/events')}
               className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-2xl font-poppins font-bold text-base transition-all flex items-center gap-2 shadow-xl hover:shadow-2xl transform hover:scale-105 hover:-translate-y-1"
+              whileHover={{ scale: 1.05, y: -3 }}
+              whileTap={{ scale: 0.95 }}
             >
               Explore All Events <ArrowRight className="w-5 h-5" />
-            </button>
+            </motion.button>
           </div>
 
-          {upcomingEvents.length > 6 ? (
+          {upcomingEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {upcomingEvents.slice(6, 9).map((event) => (
-              <div
+              {/* Show events 6-12 if more than 6 events exist, otherwise show first 3 events */}
+              {(upcomingEvents.length > 6 ? upcomingEvents.slice(6, 12) : upcomingEvents.slice(0, 3)).map((event, index) => (
+              <motion.div
                 key={event.id}
                 className="group bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer"
                 onClick={() => navigate(`/events/${event.id}`)}
+                whileHover={{ y: -10, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1, duration: 0.5 }}
               >
                 <div className="relative h-80 overflow-hidden">
                   <img
@@ -958,10 +1269,24 @@ const HomePage = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <div className="text-center py-16 bg-white rounded-2xl shadow-lg">
+              <div className="text-6xl mb-4">⭐</div>
+              <h3 className="font-bebas text-3xl text-gray-800 mb-2">No Featured Events Yet</h3>
+              <p className="font-poppins text-gray-600 mb-6">Check back soon for curated events!</p>
+              <motion.button 
+                onClick={() => navigate('/events')}
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-poppins font-bold hover:shadow-xl transition-all"
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Browse All Events
+              </motion.button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -977,7 +1302,7 @@ const HomePage = () => {
         {/* Floating Decorative Bubbles */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[...Array(15)].map((_, i) => (
-            <div
+            <motion.div
               key={i}
               className="absolute rounded-full"
               style={{
@@ -986,554 +1311,377 @@ const HomePage = () => {
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
                 background: `radial-gradient(circle, ${i % 2 === 0 ? 'rgba(236, 72, 153, 0.1)' : 'rgba(147, 51, 234, 0.1)'}, transparent)`,
-                animation: `floatBubble ${Math.random() * 15 + 10}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 5}s`
+              }}
+              animate={{
+                x: [0, (Math.random() - 0.5) * 50, 0],
+                y: [0, (Math.random() - 0.5) * 50, 0],
+              }}
+              transition={{
+                duration: Math.random() * 10 + 10,
+                repeat: Infinity,
+                repeatType: "reverse"
               }}
             />
           ))}
         </div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          {/* Header - Left Aligned with Badge */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-16 gap-6">
-            <div>
-              <div className="inline-block mb-3">
-                <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-5 py-2 rounded-full text-sm font-poppins font-bold uppercase tracking-wider">
-                  🎯 Explore
-                </span>
-              </div>
-              <h2 className="font-bebas text-5xl md:text-7xl font-black text-gray-900 mb-3 tracking-tight leading-none">
-                Event<br/>Categories
-              </h2>
-              <p className="font-poppins text-gray-600 text-lg max-w-xl">
-                Find your passion, discover new experiences
-              </p>
-            </div>
-            {/* Stats Card */}
-            <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl p-6 text-white shadow-2xl">
-              <div className="text-4xl font-bold font-bebas">{categories.length}+</div>
-              <div className="text-sm font-poppins opacity-90">Categories Available</div>
-            </div>
-          </div>
-
-          {/* Categories Grid - Masonry Style */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {Array.isArray(categories) && categories.length > 0 ? (
-              categories.map((category, index) => (
-                <div
-                  key={category.id}
-                  onClick={() => navigate(`/events?category=${category.id}`)}
-                  className="group relative bg-white rounded-2xl p-6 border-2 border-gray-100 hover:border-transparent shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer overflow-hidden"
-                  style={{
-                    animationDelay: `${index * 50}ms`,
-                    animation: 'fadeInUp 0.6s ease-out forwards',
-                    opacity: 0
-                  }}
-                >
-                  {/* Animated Gradient Background */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-all duration-500 transform group-hover:scale-110"></div>
-                  
-                  {/* Shine Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                  
-                  {/* Content */}
-                  <div className="relative z-10 flex flex-col items-center text-center">
-                    {/* Icon Container */}
-                    <div className="w-20 h-20 mb-4 bg-gradient-to-br from-pink-100 to-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-white/20 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 shadow-lg">
-                      <div className="text-purple-600 group-hover:text-white transform group-hover:scale-110 transition-all duration-300">
-                        {getCategoryIcon(category.name)}
-                      </div>
-                    </div>
-                    
-                    {/* Category Name */}
-                    <h3 className="font-poppins text-base md:text-lg font-bold text-gray-900 group-hover:text-white transition-colors duration-300 mb-2">
-                      {category.name}
-                    </h3>
-                    
-                    {/* Event Count Badge */}
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 group-hover:bg-white/20 rounded-full transition-all duration-300">
-                      <Ticket className="w-3.5 h-3.5 text-purple-600 group-hover:text-white" />
-                      <span className="text-xs font-poppins font-semibold text-gray-700 group-hover:text-white">
-                        {category.event_count || 0} Events
-                      </span>
-                    </div>
-                    
-                    {/* Description - Hidden on mobile, show on hover */}
-                    <p className="hidden md:block font-poppins text-xs text-gray-500 group-hover:text-pink-100 transition-colors duration-300 mt-3 line-clamp-2 opacity-0 group-hover:opacity-100">
-                      {category.description || 'Explore exciting events'}
-                    </p>
-                  </div>
-
-                  {/* Corner Accent */}
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-pink-500/10 to-transparent rounded-bl-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
-                  {/* Bottom Arrow */}
-                  <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                    <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                      <ArrowRight className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-16">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-200 border-t-purple-600 mb-4"></div>
-                <p className="text-gray-500 font-poppins font-medium">Loading categories...</p>
-              </div>
-            )}
-          </div>
-
-          {/* View All Button */}
-          {categories.length > 0 && (
-            <div className="text-center mt-12 relative z-30">
-              <button
-                onClick={() => navigate('/events')}
-                className="group inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-poppins font-bold text-base shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
-              >
-                <span>Explore All Events</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* CSS Animation */}
-        <style jsx>{`
-          @keyframes fadeInUp {
-            from {
-              opacity: 0;
-              transform: translateY(30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          
-          @keyframes floatBubble {
-            0%, 100% {
-              transform: translate(0, 0) scale(1);
-              opacity: 0.3;
-            }
-            25% {
-              transform: translate(20px, -30px) scale(1.1);
-              opacity: 0.5;
-            }
-            50% {
-              transform: translate(-15px, -60px) scale(0.9);
-              opacity: 0.4;
-            }
-            75% {
-              transform: translate(10px, -40px) scale(1.05);
-              opacity: 0.6;
-            }
-          }
-        `}</style>
-        
-        {/* Gradient Fade to White */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white pointer-events-none"></div>
-      </section>
-
-      {/* About Section - Simple & Brief */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <FadeInUp>
-            <div className="text-center mb-12">
-              <h2 className="font-bebas text-4xl md:text-5xl font-black text-gray-900 mb-4">
-                TENTANG EVENTHUB
-              </h2>
-              <div className="w-24 h-1 bg-gradient-to-r from-pink-500 to-purple-600 mx-auto"></div>
-            </div>
-          </FadeInUp>
-
-          <ScaleIn delay={0.2}>
-            <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 border border-gray-100">
-            <p className="font-poppins text-lg text-gray-700 leading-relaxed text-center mb-6">
-              <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">EventHub</span> adalah platform digital terpercaya untuk menemukan, mendaftar, dan mengelola berbagai event menarik di Indonesia. 
-              Kami menghubungkan penyelenggara event dengan peserta melalui sistem yang mudah, aman, dan modern.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-              <div className="text-center p-4">
-                <div className="text-3xl mb-2">🎯</div>
-                <h3 className="font-poppins font-bold text-gray-900 mb-2">Misi Kami</h3>
-                <p className="font-poppins text-sm text-gray-600">
-                  Memudahkan akses ke event berkualitas untuk semua orang
-                </p>
-              </div>
-              
-              <div className="text-center p-4">
-                <div className="text-3xl mb-2">⚡</div>
-                <h3 className="font-poppins font-bold text-gray-900 mb-2">Teknologi</h3>
-                <p className="font-poppins text-sm text-gray-600">
-                  Platform modern dengan sistem pembayaran & sertifikat digital
-                </p>
-              </div>
-              
-              <div className="text-center p-4">
-                <div className="text-3xl mb-2">🤝</div>
-                <h3 className="font-poppins font-bold text-gray-900 mb-2">Komunitas</h3>
-                <p className="font-poppins text-sm text-gray-600">
-                  Menghubungkan 10,000+ pengguna dengan event impian mereka
-                </p>
-              </div>
-            </div>
-          </div>
-          </ScaleIn>
-        </div>
-      </section>
-
-      {/* Testimonials/Reviews Section */}
-      <section className="py-24 bg-white relative overflow-hidden">
-        {/* Background Decorations */}
-        <div className="absolute top-0 left-0 w-64 h-64 bg-purple-100 rounded-full blur-3xl opacity-30 -translate-x-1/2"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-pink-100 rounded-full blur-3xl opacity-30 translate-x-1/2"></div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Header */}
           <FadeInUp>
             <div className="text-center mb-16">
-              <div className="inline-block mb-4">
-                <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-poppins font-bold">
-                  ⭐ TESTIMONIALS
+              <motion.div 
+                className="inline-block mb-4"
+                whileHover={{ scale: 1.1, rotate: 5 }}
+              >
+                <span className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-full text-sm font-poppins font-bold shadow-lg">
+                  🎯 EXPLORE CATEGORIES
                 </span>
-              </div>
-              <h2 className="font-bebas text-5xl md:text-6xl font-black text-gray-900 mb-4 tracking-tight">
-                APA KATA MEREKA?
+              </motion.div>
+              <h2 className="font-bebas text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 mb-6 tracking-tight">
+                Event Categories
               </h2>
-              <p className="font-poppins text-gray-600 text-lg max-w-2xl mx-auto">
-                Ribuan pengguna telah mempercayai EventHub untuk pengalaman event terbaik mereka
+              <p className="font-poppins text-gray-600 text-xl max-w-3xl mx-auto leading-relaxed">
+                Discover events tailored to <span className="font-bold text-purple-600">your interests</span>
               </p>
             </div>
           </FadeInUp>
 
-          {/* Auto-Scrolling Testimonials */}
-          <div className="relative">
-            {/* Gradient Overlays */}
-            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-white to-transparent z-10"></div>
-            <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-white to-transparent z-10"></div>
+          {/* Categories Grid */}
+          {categories.length > 0 ? (
+            <StaggerContainer staggerDelay={0.1}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {categories.map((category, index) => (
+                  <StaggerItem key={category.id}>
+                    <motion.div
+                      className="group relative bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden"
+                      onClick={() => navigate(`/events?category=${category.id}`)}
+                      whileHover={{ y: -10, scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {/* Gradient Background on Hover */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+                      
+                      {/* Icon */}
+                      <div className="relative mb-4 flex justify-center">
+                        <motion.div 
+                          className="w-20 h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center group-hover:from-purple-500 group-hover:to-pink-500 transition-all duration-300"
+                          whileHover={{ rotate: 360 }}
+                          transition={{ duration: 0.6 }}
+                        >
+                          <div className="text-purple-600 group-hover:text-white transition-colors duration-300">
+                            {getCategoryIcon(category.name)}
+                          </div>
+                        </motion.div>
+                      </div>
+                      
+                      {/* Category Name */}
+                      <h3 className="font-poppins text-center text-lg font-bold text-gray-800 group-hover:text-purple-600 transition-colors duration-300 mb-2">
+                        {category.name}
+                      </h3>
+                      
+                      {/* Event Count */}
+                      <p className="font-poppins text-center text-sm text-gray-500 group-hover:text-purple-500 transition-colors duration-300">
+                        {category.event_count || 0} Events
+                      </p>
+                      
+                      {/* Hover Arrow */}
+                      <motion.div 
+                        className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        initial={{ x: -10 }}
+                        whileHover={{ x: 0 }}
+                      >
+                        <ArrowRight className="w-5 h-5 text-purple-600" />
+                      </motion.div>
+                    </motion.div>
+                  </StaggerItem>
+                ))}
+              </div>
+            </StaggerContainer>
+          ) : (
+            <div className="text-center py-16 bg-white rounded-2xl shadow-lg">
+              <div className="text-6xl mb-4">🎭</div>
+              <h3 className="font-bebas text-3xl text-gray-800 mb-2">No Categories Yet</h3>
+              <p className="font-poppins text-gray-600">Categories will appear here soon!</p>
+            </div>
+          )}
+        </div>
+      </section>
 
-            {/* Scrolling Container */}
-            <div className="overflow-hidden">
-              {reviews.length > 0 ? (
-                <div className="flex gap-6 animate-scroll-testimonials">
-                  {/* Real reviews from database */}
-                  {reviews.slice(0, 8).concat(reviews.slice(0, 8)).map((review, index) => {
-                    const gradients = [
-                      'from-purple-50 to-pink-50 border-purple-200',
-                      'from-blue-50 to-purple-50 border-blue-200',
-                      'from-pink-50 to-orange-50 border-pink-200',
-                      'from-green-50 to-blue-50 border-green-200',
-                    ];
-                    return (
-                      <div key={`review-${index}`} className={`flex-shrink-0 w-96 bg-gradient-to-br ${gradients[index % 4]} p-6 rounded-2xl border shadow-lg hover:shadow-xl transition-shadow`}>
-                        <div className="flex items-center mb-4">
-                          <img src={`https://i.pravatar.cc/150?u=${review.user_id}`} alt={review.full_name} className="w-12 h-12 rounded-full mr-4" />
+      {/* Reviews Section - Testimonials */}
+      <section className="py-32 bg-gradient-to-b from-white via-purple-50 to-white relative overflow-hidden">
+        {/* Decorative Elements */}
+        <div className="absolute top-0 left-0 w-96 h-96 bg-pink-200 rounded-full blur-3xl opacity-20"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-200 rounded-full blur-3xl opacity-20"></div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          {/* Header */}
+          <FadeInUp>
+            <div className="text-center mb-20">
+              <motion.div 
+                className="inline-block mb-4"
+                whileHover={{ scale: 1.1 }}
+              >
+                <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-poppins font-bold shadow-lg">
+                  ⭐ TESTIMONIALS
+                </span>
+              </motion.div>
+              <h2 className="font-bebas text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 mb-6 tracking-tight">
+                What People Say
+              </h2>
+              <p className="font-poppins text-gray-600 text-xl max-w-3xl mx-auto leading-relaxed">
+                Real experiences from our <span className="font-bold text-purple-600">amazing community</span>
+              </p>
+            </div>
+          </FadeInUp>
+
+          {/* Reviews Grid */}
+          {reviews.length > 0 ? (
+            <StaggerContainer staggerDelay={0.15}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {reviews.slice(0, 6).map((review, index) => (
+                  <StaggerItem key={review.id}>
+                    <motion.div
+                      className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 relative overflow-hidden group"
+                      whileHover={{ y: -10 }}
+                    >
+                      {/* Gradient Border Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ padding: '2px' }}>
+                        <div className="bg-white rounded-2xl w-full h-full"></div>
+                      </div>
+                      
+                      <div className="relative z-10">
+                        {/* Stars Rating */}
+                        <div className="flex gap-1 mb-4">
+                          {[...Array(5)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              initial={{ opacity: 0, scale: 0 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: index * 0.1 + i * 0.05 }}
+                            >
+                              <Star 
+                                className={`w-5 h-5 ${
+                                  i < (review.rating || 5) 
+                                    ? 'fill-yellow-400 text-yellow-400' 
+                                    : 'text-gray-300'
+                                }`} 
+                              />
+                            </motion.div>
+                          ))}
+                        </div>
+                        
+                        {/* Review Text */}
+                        <p className="font-poppins text-gray-700 text-base mb-6 leading-relaxed line-clamp-4">
+                          "{review.comment || review.review_text}"
+                        </p>
+                        
+                        {/* User Info */}
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                            {(review.user_name || review.username || 'A').charAt(0).toUpperCase()}
+                          </div>
                           <div>
-                            <h4 className="font-poppins font-bold text-gray-900">{review.full_name}</h4>
-                            <div className="flex text-yellow-400">
-                              {'⭐'.repeat(review.rating)}
-                            </div>
+                            <h4 className="font-poppins font-bold text-gray-900">
+                              {review.user_name || review.username || 'Anonymous'}
+                            </h4>
+                            <p className="font-poppins text-sm text-gray-500">
+                              {review.event_title || 'Event Attendee'}
+                            </p>
                           </div>
                         </div>
-                        <p className="font-poppins text-gray-700 italic line-clamp-3">
-                          "{review.comment}"
-                        </p>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex gap-6 animate-scroll-testimonials">
-                  {/* Fallback testimonials */}
-                <div className="flex-shrink-0 w-96 bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl border border-purple-200 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <img src="https://i.pravatar.cc/150?img=1" alt="User" className="w-12 h-12 rounded-full mr-4" />
-                    <div>
-                      <h4 className="font-poppins font-bold text-gray-900">Budi Santoso</h4>
-                      <div className="flex text-yellow-400">
-                        {'⭐'.repeat(5)}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="font-poppins text-gray-700 italic">
-                    "Platform terbaik untuk menemukan event! Saya sudah ikut 10+ event dan semuanya amazing. UI nya juga modern banget!"
-                  </p>
-                </div>
-
-                <div className="flex-shrink-0 w-96 bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-2xl border border-blue-200 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <img src="https://i.pravatar.cc/150?img=5" alt="User" className="w-12 h-12 rounded-full mr-4" />
-                    <div>
-                      <h4 className="font-poppins font-bold text-gray-900">Siti Nurhaliza</h4>
-                      <div className="flex text-yellow-400">
-                        {'⭐'.repeat(5)}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="font-poppins text-gray-700 italic">
-                    "Registrasi mudah, payment smooth, dan dapat sertifikat digital langsung. Sangat profesional!"
-                  </p>
-                </div>
-
-                <div className="flex-shrink-0 w-96 bg-gradient-to-br from-pink-50 to-orange-50 p-6 rounded-2xl border border-pink-200 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <img src="https://i.pravatar.cc/150?img=8" alt="User" className="w-12 h-12 rounded-full mr-4" />
-                    <div>
-                      <h4 className="font-poppins font-bold text-gray-900">Ahmad Rizki</h4>
-                      <div className="flex text-yellow-400">
-                        {'⭐'.repeat(5)}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="font-poppins text-gray-700 italic">
-                    "Event tech conference yang saya ikuti sangat berkualitas. Worth it banget dengan harga yang ditawarkan!"
-                  </p>
-                </div>
-
-                <div className="flex-shrink-0 w-96 bg-gradient-to-br from-green-50 to-blue-50 p-6 rounded-2xl border border-green-200 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="User" className="w-12 h-12 rounded-full mr-4" />
-                    <div>
-                      <h4 className="font-poppins font-bold text-gray-900">Dewi Lestari</h4>
-                      <div className="flex text-yellow-400">
-                        {'⭐'.repeat(5)}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="font-poppins text-gray-700 italic">
-                    "Sistemnya user-friendly dan customer service nya responsif. Highly recommended untuk semua orang!"
-                  </p>
-                </div>
-
-                {/* Row 2 - Duplicate untuk infinite scroll */}
-                <div className="flex-shrink-0 w-96 bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl border border-purple-200 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <img src="https://i.pravatar.cc/150?img=1" alt="User" className="w-12 h-12 rounded-full mr-4" />
-                    <div>
-                      <h4 className="font-poppins font-bold text-gray-900">Budi Santoso</h4>
-                      <div className="flex text-yellow-400">
-                        {'⭐'.repeat(5)}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="font-poppins text-gray-700 italic">
-                    "Platform terbaik untuk menemukan event! Saya sudah ikut 10+ event dan semuanya amazing. UI nya juga modern banget!"
-                  </p>
-                </div>
-
-                <div className="flex-shrink-0 w-96 bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-2xl border border-blue-200 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <img src="https://i.pravatar.cc/150?img=5" alt="User" className="w-12 h-12 rounded-full mr-4" />
-                    <div>
-                      <h4 className="font-poppins font-bold text-gray-900">Siti Nurhaliza</h4>
-                      <div className="flex text-yellow-400">
-                        {'⭐'.repeat(5)}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="font-poppins text-gray-700 italic">
-                    "Registrasi mudah, payment smooth, dan dapat sertifikat digital langsung. Sangat profesional!"
-                  </p>
-                </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-16">
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bebas font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 mb-2">
-                4.9/5
+                    </motion.div>
+                  </StaggerItem>
+                ))}
               </div>
-              <p className="font-poppins text-gray-600 font-medium">Rating Rata-rata</p>
+            </StaggerContainer>
+          ) : (
+            <div className="text-center py-16 bg-white rounded-2xl shadow-lg">
+              <div className="text-6xl mb-4">💬</div>
+              <h3 className="font-bebas text-3xl text-gray-800 mb-2">No Reviews Yet</h3>
+              <p className="font-poppins text-gray-600">Be the first to share your experience!</p>
             </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bebas font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 mb-2">
-                10K+
-              </div>
-              <p className="font-poppins text-gray-600 font-medium">Happy Users</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bebas font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 mb-2">
-                500+
-              </div>
-              <p className="font-poppins text-gray-600 font-medium">Events Hosted</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bebas font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 mb-2">
-                98%
-              </div>
-              <p className="font-poppins text-gray-600 font-medium">Satisfaction</p>
-            </div>
-          </div>
-
-          {/* CTA Button */}
-          <div className="text-center mt-12">
-            <button
-              onClick={() => navigate('/reviews')}
-              className="group bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-poppins font-bold px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl inline-flex items-center gap-3"
-            >
-              <span>⭐ Buat Ulasan Kamu Juga</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
-            </button>
-            <p className="font-poppins text-sm text-gray-500 mt-4">
-              Bagikan pengalaman Anda dan bantu kami menjadi lebih baik!
-            </p>
-          </div>
+          )}
         </div>
-
-        {/* CSS Animation */}
-        <style>{`
-          @keyframes scroll-testimonials {
-            0% {
-              transform: translateX(0);
-            }
-            100% {
-              transform: translateX(-50%);
-            }
-          }
-          
-          .animate-scroll-testimonials {
-            animation: scroll-testimonials 30s linear infinite;
-          }
-          
-          .animate-scroll-testimonials:hover {
-            animation-play-state: paused;
-          }
-        `}</style>
       </section>
 
-      {/* Mobile App CTA Section */}
-      <section className="py-20 bg-white relative overflow-hidden">
-        {/* Bottom fade-out gradient to gray for footer */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-gray-900"></div>
+      {/* Mobile App Preview Section */}
+      <section className="py-32 bg-gradient-to-br from-purple-900 via-purple-800 to-black relative overflow-hidden">
+        {/* Animated Background */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-20 w-72 h-72 bg-pink-500 rounded-full blur-3xl opacity-20 animate-pulse"></div>
+          <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500 rounded-full blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        </div>
         
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 opacity-10">
-          {[...Array(15)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-3 h-3 bg-purple-400 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animation: `float ${3 + Math.random() * 2}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 2}s`
-              }}
-            ></div>
-          ))}
-        </div>
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Left Content */}
-            <div>
-              <div className="inline-block mb-4">
-                <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
-                  📱 Coming Soon
-                </span>
-              </div>
-              
-              <h2 className="font-bebas text-5xl md:text-7xl font-black mb-6 leading-tight text-gray-900">
-                DOWNLOAD OUR
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">
-                  MOBILE APP
-                </span>
-              </h2>
-              
-              <p className="font-poppins text-lg md:text-xl text-gray-700 mb-8 leading-relaxed">
-                Akses semua event favorit Anda langsung dari smartphone. Daftar event, kelola tiket, dan dapatkan notifikasi real-time.
-              </p>
-
-              {/* Features List */}
-              <div className="space-y-4 mb-10">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-pink-100 to-purple-100 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-pink-200">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-poppins font-semibold text-gray-900">Event Discovery</h4>
-                    <p className="font-poppins text-sm text-gray-600">Temukan event menarik di sekitar Anda</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-pink-100 to-purple-100 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-pink-200">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-poppins font-semibold text-gray-900">Digital Tickets</h4>
-                    <p className="font-poppins text-sm text-gray-600">Tiket digital langsung di smartphone Anda</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-pink-100 to-purple-100 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-pink-200">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-poppins font-semibold text-gray-900">Smart Notifications</h4>
-                    <p className="font-poppins text-sm text-gray-600">Notifikasi untuk event yang Anda ikuti</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* CTA Buttons */}
-              <div className="flex flex-wrap gap-4">
-                <button
-                  onClick={() => navigate('/mobile-app')}
-                  className="group bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-poppins font-bold px-8 py-4 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center gap-3"
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            {/* Left: Content */}
+            <FadeInLeft>
+              <div className="text-white">
+                <motion.div 
+                  className="inline-block mb-6"
+                  whileHover={{ scale: 1.1 }}
                 >
-                  <span>Learn More</span>
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
-                </button>
+                  <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-poppins font-bold shadow-lg">
+                    📱 DOWNLOAD APP
+                  </span>
+                </motion.div>
                 
-                <button className="bg-gray-100 hover:bg-gray-200 text-gray-900 font-poppins font-semibold px-8 py-4 rounded-full transition-all duration-300 border-2 border-gray-300">
-                  Get Notified
-                </button>
-              </div>
-            </div>
+                <h2 className="font-bebas text-5xl md:text-7xl font-black mb-6 leading-tight">
+                  Get Event Yukk<br/>On Mobile
+                </h2>
+                
+                <p className="font-poppins text-gray-300 text-xl mb-8 leading-relaxed">
+                  Experience the best event booking platform on your mobile device. 
+                  Book tickets, manage registrations, and get real-time updates on the go!
+                </p>
+                
+                {/* Features List */}
+                <div className="space-y-4 mb-8">
+                  {[
+                    { icon: '⚡', text: 'Lightning fast booking' },
+                    { icon: '🔔', text: 'Real-time notifications' },
+                    { icon: '🎫', text: 'Digital tickets & QR codes' },
+                    { icon: '🌟', text: 'Personalized recommendations' }
+                  ].map((feature, index) => (
+                    <motion.div
+                      key={index}
+                      className="flex items-center gap-4"
+                      initial={{ opacity: 0, x: -30 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      viewport={{ once: true }}
+                    >
+                      <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-2xl">
+                        {feature.icon}
+                      </div>
+                      <span className="font-poppins text-lg">{feature.text}</span>
+                    </motion.div>
+                  ))}
+                </div>
+                
+                {/* CTA Button to Mobile App Page */}
+                <motion.button
+                  onClick={() => navigate('/mobile-app')}
+                  className="mb-6 px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-2xl font-poppins font-bold transition-all shadow-lg hover:shadow-2xl flex items-center gap-3"
+                  whileHover={{ scale: 1.05, y: -3 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <span>📱</span>
+                  <span>Lihat Halaman Mobile App</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </motion.button>
 
-            {/* Right Content - Phone Mockup */}
-            <div className="relative">
-              <div className="relative mx-auto w-64 md:w-80">
-                {/* Phone Frame */}
-                <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-[3rem] p-3 shadow-2xl transform hover:scale-105 transition-transform duration-300">
-                  {/* Screen */}
-                  <div className="bg-white rounded-[2.5rem] overflow-hidden">
-                    <img 
-                      src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=800&fit=crop"
-                      alt="EventHub Mobile App"
-                      className="w-full h-auto"
-                    />
-                  </div>
+                {/* Download Buttons */}
+                <div className="flex flex-wrap gap-4">
+                  <motion.button
+                    onClick={() => navigate('/mobile-app')}
+                    className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-2xl font-poppins font-bold hover:shadow-2xl transition-all"
+                    whileHover={{ scale: 1.05, y: -3 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                    </svg>
+                    <div className="text-left">
+                      <div className="text-xs">Download on the</div>
+                      <div className="text-lg font-bold">App Store</div>
+                    </div>
+                  </motion.button>
                   
-                  {/* Notch */}
-                  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-gray-900 rounded-b-3xl"></div>
-                </div>
-
-                {/* Floating Elements */}
-                <div className="absolute -top-4 -right-4 bg-pink-500 text-white px-4 py-2 rounded-full font-poppins font-bold text-sm shadow-lg animate-bounce">
-                  New!
-                </div>
-                
-                <div className="absolute -bottom-4 -left-4 bg-purple-600 text-white px-4 py-2 rounded-full font-poppins font-bold text-sm shadow-lg">
-                  iOS & Android
+                  <motion.button
+                    onClick={() => navigate('/mobile-app')}
+                    className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-2xl font-poppins font-bold hover:shadow-2xl transition-all"
+                    whileHover={{ scale: 1.05, y: -3 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
+                    </svg>
+                    <div className="text-left">
+                      <div className="text-xs">Get it on</div>
+                      <div className="text-lg font-bold">Google Play</div>
+                    </div>
+                  </motion.button>
                 </div>
               </div>
-            </div>
+            </FadeInLeft>
+            
+            {/* Right: Phone Mockup */}
+            <FadeInRight>
+              <div className="relative">
+                {/* Floating Animation */}
+                <motion.div
+                  animate={{ y: [-20, 20, -20] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  className="relative z-10"
+                >
+                  {/* Phone Frame */}
+                  <div className="relative mx-auto w-[300px] h-[600px] bg-gray-900 rounded-[3rem] p-3 shadow-2xl">
+                    {/* Phone Screen */}
+                    <div className="w-full h-full bg-white rounded-[2.5rem] overflow-hidden relative">
+                      {/* Status Bar */}
+                      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-between px-6 text-white text-xs">
+                        <span>9:41</span>
+                        <div className="flex gap-1">
+                          <div className="w-4 h-4 border border-white rounded-sm"></div>
+                          <div className="w-4 h-4 border border-white rounded-sm"></div>
+                          <div className="w-4 h-4 border border-white rounded-sm"></div>
+                        </div>
+                      </div>
+                      
+                      {/* App Screenshot Simulation */}
+                      <div className="pt-8 bg-gradient-to-b from-purple-50 to-white h-full overflow-hidden">
+                        <div className="p-4">
+                          <div className="text-2xl font-bold text-gray-900 mb-4">Upcoming Events</div>
+                          
+                          {/* Event Cards */}
+                          {[1, 2].map((i) => (
+                            <motion.div
+                              key={i}
+                              className="bg-white rounded-xl shadow-md p-4 mb-4"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.2 }}
+                            >
+                              <div className="flex gap-3">
+                                <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-400 rounded-lg"></div>
+                                <div className="flex-1">
+                                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                                  <div className="h-3 bg-gray-100 rounded w-1/2"></div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Phone Notch */}
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1/3 h-7 bg-gray-900 rounded-b-2xl"></div>
+                  </div>
+                </motion.div>
+                
+                {/* Decorative Elements */}
+                <motion.div
+                  className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500 rounded-full blur-3xl opacity-30"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                />
+                <motion.div
+                  className="absolute -bottom-10 -left-10 w-40 h-40 bg-purple-500 rounded-full blur-3xl opacity-30"
+                  animate={{ scale: [1.2, 1, 1.2] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                />
+              </div>
+            </FadeInRight>
           </div>
         </div>
       </section>
 
+      {/* Footer */}
       <Footer />
     </div>
   );

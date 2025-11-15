@@ -12,7 +12,7 @@ INSERT INTO reviews (user_id, full_name, rating, comment, is_approved, is_verifi
 (@first_user_id, 'Ahmad Rizki', 5, 'Event tech conference yang saya ikuti sangat berkualitas. Worth it banget dengan harga yang ditawarkan! Networking opportunities nya juga bagus.', TRUE, TRUE, '2024-11-03 09:15:00'),
 (@first_user_id, 'Dewi Lestari', 5, 'Sistemnya user-friendly dan customer service nya responsif. Highly recommended untuk semua orang yang cari event berkualitas!', TRUE, TRUE, '2024-11-02 16:45:00'),
 (@first_user_id, 'Rian Firmansyah', 4, 'Pengalaman yang menyenangkan! Event yang saya ikuti terorganisir dengan baik. Sertifikat digital juga langsung diterima setelah event selesai.', TRUE, TRUE, '2024-11-01 11:00:00'),
-(@first_user_id, 'Lina Marlina', 5, 'Sebagai mahasiswa, EventHub sangat membantu saya menemukan workshop dan seminar yang relevan. Harganya juga terjangkau untuk pelajar!', TRUE, TRUE, '2024-10-31 13:30:00'),
+(@first_user_id, 'Lina Marlina', 5, 'Sebagai mahasiswa, Event Yukk sangat membantu saya menemukan workshop dan seminar yang relevan. Harganya juga terjangkau untuk pelajar!', TRUE, TRUE, '2024-10-31 13:30:00'),
 (@first_user_id, 'Yoga Pratama', 5, 'Fitur pembayaran sangat aman dan mudah. Saya bisa bayar pakai berbagai metode. Prosesnya cepat dan langsung dapat konfirmasi!', TRUE, TRUE, '2024-10-30 08:20:00'),
 (@first_user_id, 'Putri Amalia', 4, 'Event-event yang tersedia sangat beragam. Dari musik, teknologi, sampai kesehatan. Pasti ada yang cocok untuk semua orang!', TRUE, TRUE, '2024-10-29 15:10:00'),
 (@first_user_id, 'Eko Prasetyo', 5, 'Saya organizer event, dan platform ini sangat memudahkan untuk manage peserta. Dashboard adminnya lengkap dan informatif!', TRUE, TRUE, '2024-10-28 12:00:00'),

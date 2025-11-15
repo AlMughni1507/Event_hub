@@ -1,10 +1,44 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { query } = require('../db');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const ApiResponse = require('../middleware/response');
 
 const router = express.Router();
+
+// Configure multer for avatar upload
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads/avatars');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
 
 // Get all users (admin only)
 router.get('/', authenticateToken, requireAdmin, async (req, res) => {
@@ -238,6 +272,159 @@ router.get('/stats/overview', authenticateToken, requireAdmin, async (req, res) 
   } catch (error) {
     console.error('Get user stats error:', error);
     return ApiResponse.error(res, 'Failed to get user statistics');
+  }
+});
+
+// Update own profile (authenticated user)
+router.put('/profile', authenticateToken, upload.single('avatar'), async (req, res) => {
+  try {
+    const userId = req.user.id || req.user.userId || req.user;
+    if (!userId) {
+      return ApiResponse.error(res, 'User not authenticated', 401);
+    }
+    
+    const { full_name, phone } = req.body;
+
+    // Build update query
+    let updateFields = [];
+    let params = [];
+
+    if (full_name) {
+      updateFields.push('full_name = ?');
+      params.push(full_name);
+    }
+
+    if (phone) {
+      updateFields.push('phone = ?');
+      params.push(phone);
+    }
+
+    // Handle avatar upload
+    if (req.file) {
+      const avatarPath = `/uploads/avatars/${req.file.filename}`;
+      updateFields.push('avatar = ?');
+      params.push(avatarPath);
+
+      // Delete old avatar if exists
+      const [oldUser] = await query('SELECT avatar FROM users WHERE id = ?', [userId]);
+      if (oldUser[0].avatar) {
+        const oldAvatarPath = path.join(__dirname, '..', oldUser[0].avatar);
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+        }
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return ApiResponse.error(res, 'No fields to update', 400);
+    }
+
+    params.push(userId);
+    await query(
+      `UPDATE users SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      params
+    );
+
+    // Get updated user
+    const [updatedUser] = await query(
+      'SELECT id, username, email, full_name, phone, role, avatar, is_active, created_at, updated_at FROM users WHERE id = ?',
+      [userId]
+    );
+
+    return ApiResponse.success(res, { user: updatedUser[0] }, 'Profile updated successfully');
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return ApiResponse.error(res, 'Failed to update profile');
+  }
+});
+
+// Request OTP for password change
+router.post('/request-password-otp', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user.userId || req.user;
+    const EmailService = require('../services/emailService');
+    const emailService = new EmailService();
+
+    // Get user email
+    const [users] = await query('SELECT email, full_name FROM users WHERE id = ?', [userId]);
+    if (users.length === 0) {
+      return ApiResponse.notFound(res, 'User not found');
+    }
+
+    const user = users[0];
+    const otpCode = emailService.generateOTP();
+
+    // Store OTP
+    await emailService.storeOTP(userId, user.email, otpCode);
+
+    // Send OTP email
+    await emailService.sendPasswordChangeOTP(user.email, user.full_name || user.username, otpCode);
+
+    return ApiResponse.success(res, { 
+      message: 'OTP telah dikirim ke email Anda',
+      expiresIn: 15 // minutes
+    }, 'OTP sent successfully');
+
+  } catch (error) {
+    console.error('Request password OTP error:', error);
+    return ApiResponse.error(res, 'Failed to send OTP');
+  }
+});
+
+// Verify OTP and change password
+router.put('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user.userId || req.user;
+    const { otp, new_password, confirm_password } = req.body;
+
+    if (!otp || !new_password || !confirm_password) {
+      return ApiResponse.error(res, 'OTP, new password, and confirm password are required', 400);
+    }
+
+    if (new_password !== confirm_password) {
+      return ApiResponse.error(res, 'New password and confirm password do not match', 400);
+    }
+
+    if (new_password.length < 8) {
+      return ApiResponse.error(res, 'Password must be at least 8 characters', 400);
+    }
+
+    // Validate password strength
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!passwordRegex.test(new_password)) {
+      return ApiResponse.error(res, 'Password must contain at least 8 characters with uppercase, lowercase, number, and special character', 400);
+    }
+
+    // Verify OTP
+    const EmailService = require('../services/emailService');
+    const emailService = new EmailService();
+    const [otps] = await query(
+      'SELECT * FROM email_otps WHERE user_id = ? AND otp_code = ? AND expires_at > NOW() AND is_used = FALSE ORDER BY created_at DESC LIMIT 1',
+      [userId, otp]
+    );
+
+    if (otps.length === 0) {
+      return ApiResponse.error(res, 'OTP tidak valid atau sudah kadaluarsa', 400);
+    }
+
+    // Mark OTP as used
+    await query('UPDATE email_otps SET is_used = TRUE WHERE id = ?', [otps[0].id]);
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(new_password, 12);
+
+    // Update password
+    await query(
+      'UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [hashedPassword, userId]
+    );
+
+    return ApiResponse.success(res, { success: true }, 'Password changed successfully');
+
+  } catch (error) {
+    console.error('Change password error:', error);
+    return ApiResponse.error(res, 'Failed to change password');
   }
 });
 

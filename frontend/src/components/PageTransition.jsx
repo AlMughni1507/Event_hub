@@ -6,26 +6,29 @@ const PageTransition = ({ children }) => {
     <motion.div
       initial={{ 
         opacity: 0,
-        x: 100,
+        y: 30,
         filter: 'blur(10px)'
       }}
       animate={{ 
         opacity: 1,
-        x: 0,
+        y: 0,
         filter: 'blur(0px)'
       }}
       exit={{ 
         opacity: 0,
-        x: -100,
+        y: -30,
         filter: 'blur(10px)'
       }}
       transition={{
-        duration: 0.4,
-        ease: [0.4, 0, 0.2, 1], // Material Design easing
-        x: {
+        duration: 0.7,
+        ease: [0.25, 0.1, 0.25, 1],
+        y: {
           type: "spring",
-          stiffness: 260,
+          stiffness: 200,
           damping: 25
+        },
+        filter: {
+          duration: 0.7
         }
       }}
     >

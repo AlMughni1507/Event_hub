@@ -160,6 +160,26 @@ router.post('/submit', async (req, res) => {
       userAgent
     );
 
+    // Update registration status to 'attended' and attendance_status
+    await query(
+      `UPDATE registrations 
+       SET status = 'attended', 
+           attendance_status = 'attended',
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE user_id = ? AND event_id = ?`,
+      [verification.tokenData.user_id, event_id]
+    );
+
+    // Also update event_registrations if exists
+    await query(
+      `UPDATE event_registrations 
+       SET status = 'attended', 
+           attendance_status = 'attended',
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE user_id = ? AND event_id = ?`,
+      [verification.tokenData.user_id, event_id]
+    );
+
     return ApiResponse.success(res, {
       attendanceId: result.attendanceId,
       message: result.message,

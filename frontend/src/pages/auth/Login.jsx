@@ -165,7 +165,7 @@ const LoginPage = () => {
               <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
                 <Calendar className="w-7 h-7 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-white">EventHub</h1>
+              <h1 className="text-2xl font-bold text-white">Event Yukk</h1>
             </div>
 
             <div className="max-w-lg">
@@ -199,7 +199,7 @@ const LoginPage = () => {
               <h2 className="text-4xl font-bebas font-black text-white mb-2">
                 SIGN IN
               </h2>
-              <p className="text-gray-300 font-poppins">Welcome back to EventHub</p>
+              <p className="text-gray-300 font-poppins">Welcome back to Event Yukk</p>
             </div>
 
             {error && (

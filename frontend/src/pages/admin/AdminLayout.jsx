@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { adminAPI } from '../../services/api';
 import ConfirmModal from '../../components/ConfirmModal';
 import { 
   LayoutDashboard, 
@@ -27,12 +28,39 @@ const AdminLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [quickStats, setQuickStats] = useState({ events: 0, users: 0 });
+  const [quickLoading, setQuickLoading] = useState(true);
 
   useEffect(() => {
     // Set active menu based on current path
     const path = location.pathname.split('/')[2] || 'dashboard';
     setActiveMenu(path);
   }, [location]);
+
+  useEffect(() => {
+    const fetchQuickStats = async () => {
+      try {
+        const [eventsRes, usersRes] = await Promise.all([
+          adminAPI.getAllEvents({ limit: 1 }),
+          adminAPI.getAllUsers({ limit: 1 })
+        ]);
+
+        const eventsData = eventsRes.data || {};
+        const usersData = usersRes.data || {};
+
+        setQuickStats({
+          events: eventsData.pagination?.total || eventsData.events?.length || 0,
+          users: usersData.pagination?.total || usersData.users?.length || 0
+        });
+      } catch (error) {
+        console.error('Failed to fetch quick stats:', error);
+      } finally {
+        setQuickLoading(false);
+      }
+    };
+
+    fetchQuickStats();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -113,6 +141,20 @@ const AdminLayout = () => {
       icon: MessageSquare,
       path: '/admin/reviews',
       description: 'User Reviews Management'
+    },
+    {
+      id: 'reports',
+      label: 'Laporan & Rekap',
+      icon: FileText,
+      path: '/admin/reports',
+      description: 'Rekap Data & Statistik'
+    },
+    {
+      id: 'contacts',
+      label: 'Contacts',
+      icon: MessageSquare,
+      path: '/admin/contacts',
+      description: 'Contact Management'
     }
   ];
 
@@ -127,7 +169,7 @@ const AdminLayout = () => {
             <div className="flex items-center justify-between">
               <div className={`${sidebarOpen ? 'block' : 'hidden'} transition-all duration-300`}>
                 <h1 className="text-2xl font-bold text-black">
-                  EventHub Admin
+                  Event Yukk Admin
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">Management Dashboard</p>
               </div>
@@ -209,13 +251,17 @@ const AdminLayout = () => {
               <div className="flex items-center space-x-4">
                 {/* Quick Stats */}
                 <div className="hidden md:flex items-center space-x-4">
-                  <div className="bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg">
-                    <div className="text-gray-600 text-sm">Active Events</div>
-                    <div className="text-black font-bold">12</div>
+                  <div className="bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg min-w-[120px]">
+                    <div className="text-gray-500 text-xs uppercase tracking-wide">Event aktif</div>
+                    <div className="text-gray-900 font-semibold text-lg">
+                      {quickLoading ? '...' : quickStats.events}
+                    </div>
                   </div>
-                  <div className="bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg">
-                    <div className="text-gray-600 text-sm">Total Users</div>
-                    <div className="text-black font-bold">1,234</div>
+                  <div className="bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg min-w-[120px]">
+                    <div className="text-gray-500 text-xs uppercase tracking-wide">Total user</div>
+                    <div className="text-gray-900 font-semibold text-lg">
+                      {quickLoading ? '...' : quickStats.users}
+                    </div>
                   </div>
                 </div>
 

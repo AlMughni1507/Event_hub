@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmModal from '../../components/ConfirmModal';
-import { Calendar, Trash2, Edit, Eye, Star, Award, FileText, Image as ImageIcon, Download, FileSpreadsheet } from 'lucide-react';
+import { Calendar, Trash2, Edit, Eye, Star, Award, FileText, Image as ImageIcon, Download, FileSpreadsheet, Archive, RotateCcw, Clock, File, Users } from 'lucide-react';
 import api from '../../services/api';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -10,12 +10,16 @@ import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, Align
 
 const EventsManagement = () => {
   const toast = useToast();
+  const location = useLocation();
   const [events, setEvents] = useState([]);
+  const [archivedEvents, setArchivedEvents] = useState([]);
+  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'archived'
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [categories, setCategories] = useState([]);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null });
+  const [archiveConfirm, setArchiveConfirm] = useState({ show: false, eventId: null, action: 'archive' });
   const [generateConfirm, setGenerateConfirm] = useState({ show: false, event: null });
   const [formData, setFormData] = useState({
     title: '',
@@ -47,22 +51,60 @@ const EventsManagement = () => {
   const [selectedEventForCert, setSelectedEventForCert] = useState(null);
   const [performers, setPerformers] = useState([]);
   const [performerInputs, setPerformerInputs] = useState([{ name: '', photo: null, photoPreview: null }]);
+  const [participantsModal, setParticipantsModal] = useState({
+    show: false,
+    event: null,
+    loading: false,
+    participants: [],
+  });
 
+  // Fetch events on mount and when returning from edit page
   useEffect(() => {
     fetchEvents();
+    fetchArchivedEvents();
     fetchCategories();
-  }, []);
+  }, [location.pathname]);
+
+  // Also refresh when location state changes (from navigation)
+  useEffect(() => {
+    if (location.state?.refresh) {
+      console.log('🔄 Refreshing events due to location state');
+      fetchEvents();
+      fetchArchivedEvents();
+    }
+  }, [location.state]);
 
   const fetchEvents = async () => {
     try {
       setLoading(true);
       console.log('🔄 Fetching events...');
-      const response = await api.get('/events');
-      const eventsData = response.data.events || response.data.data || [];
+      // Fetch all events without pagination limit
+      const response = await api.get('/admin/events', {
+        params: {
+          limit: 1000, // Get all events
+          page: 1
+        }
+      });
+      console.log('📦 Raw API Response:', response.data);
+      
+      // Handle different response structures
+      let eventsData = [];
+      if (response.data.success && response.data.data) {
+        eventsData = response.data.data.events || response.data.data || [];
+      } else if (response.data.events) {
+        eventsData = response.data.events;
+      } else if (Array.isArray(response.data.data)) {
+        eventsData = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        eventsData = response.data;
+      }
+      
       console.log('✅ Events fetched:', eventsData.length, eventsData);
-      setEvents(eventsData);
+      setEvents(Array.isArray(eventsData) ? eventsData : []);
     } catch (error) {
       console.error('❌ Error fetching events:', error);
+      console.error('Error details:', error.response?.data);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -81,18 +123,147 @@ const EventsManagement = () => {
     }
   };
 
+  // ============ ARCHIVED EVENTS FUNCTIONS ============
+
+  const fetchArchivedEvents = async () => {
+    try {
+      console.log('🔄 Fetching archived events...');
+      const response = await api.get('/history/archived');
+      
+      if (response.data.success) {
+        const archived = response.data.data.events || [];
+        console.log('✅ Archived events fetched:', archived.length);
+        setArchivedEvents(archived);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching archived events:', error);
+      setArchivedEvents([]);
+    }
+  };
+
+  const handleManualArchive = async () => {
+    try {
+      toast.info('🔄 Mengarsipkan event yang sudah berakhir...');
+      const response = await api.post('/history/archive-now');
+      
+      if (response.data.success) {
+        toast.success(`✅ ${response.data.message}`);
+        fetchEvents();
+        fetchArchivedEvents();
+      }
+    } catch (error) {
+      console.error('Error manual archive:', error);
+      toast.error('❌ Gagal mengarsipkan event');
+    }
+  };
+
+  const handleArchiveEvent = async (eventId) => {
+    try {
+      // Manually archive a specific event
+      await api.put(`/events/${eventId}`, {
+        is_active: false,
+        status: 'archived'
+      });
+      
+      toast.success('✅ Event berhasil diarsipkan');
+      fetchEvents();
+      fetchArchivedEvents();
+      setArchiveConfirm({ show: false, eventId: null, action: 'archive' });
+    } catch (error) {
+      console.error('Error archiving event:', error);
+      toast.error('❌ Gagal mengarsipkan event');
+    }
+  };
+
+  const handleRestoreEvent = async (eventId) => {
+    try {
+      const response = await api.post(`/history/restore/${eventId}`);
+      
+      if (response.data.success) {
+        toast.success('✅ Event berhasil dipulihkan');
+        fetchEvents();
+        fetchArchivedEvents();
+        setArchiveConfirm({ show: false, eventId: null, action: 'restore' });
+      }
+    } catch (error) {
+      console.error('Error restoring event:', error);
+      toast.error('❌ Gagal memulihkan event');
+    }
+  };
+
+  const openParticipantsModal = async (eventItem) => {
+    setParticipantsModal({
+      show: true,
+      event: eventItem,
+      loading: true,
+      participants: [],
+    });
+
+    try {
+      const response = await api.get('/admin/registrations', {
+        params: {
+          event_id: eventItem.id,
+          limit: 500,
+          page: 1,
+        },
+      });
+
+      const registrationsData =
+        response?.data?.registrations ||
+        response?.data?.data?.registrations ||
+        response?.registrations ||
+        response?.data ||
+        [];
+
+      setParticipantsModal((prev) => ({
+        ...prev,
+        loading: false,
+        participants: Array.isArray(registrationsData) ? registrationsData : [],
+      }));
+    } catch (error) {
+      console.error('Error fetching participants:', error);
+      toast.error('Gagal memuat data peserta');
+      setParticipantsModal((prev) => ({
+        ...prev,
+        loading: false,
+      }));
+    }
+  };
+
+  const closeParticipantsModal = () => {
+    if (participantsModal.loading) return;
+    setParticipantsModal({
+      show: false,
+      event: null,
+      loading: false,
+      participants: [],
+    });
+  };
+
   // ============ EXPORT FUNCTIONS ============
   
   // Fetch detailed event report data
   const fetchEventReportData = async (eventId) => {
     try {
-      const [registrationsRes, paymentsRes] = await Promise.all([
-        api.get(`/event-registrations/event/${eventId}`),
-        api.get(`/payments/event/${eventId}`)
-      ]);
+      // Use correct endpoints
+      const registrationsRes = await api.get(`/admin/registrations`, {
+        params: { event_id: eventId, limit: 1000 }
+      });
       
-      const registrations = registrationsRes.data || registrationsRes.data?.data || [];
-      const payments = paymentsRes.data || paymentsRes.data?.data || [];
+      const registrations = registrationsRes.data?.data?.registrations || 
+                           registrationsRes.data?.registrations || 
+                           registrationsRes.data?.data || [];
+      
+      // Payments might not have data, handle gracefully
+      let payments = [];
+      try {
+        const paymentsRes = await api.get(`/payments`, {
+          params: { event_id: eventId }
+        });
+        payments = paymentsRes.data?.data || paymentsRes.data || [];
+      } catch (paymentError) {
+        console.warn('Payments endpoint not available:', paymentError.message);
+      }
       
       return { registrations, payments };
     } catch (error) {
@@ -331,6 +502,83 @@ const EventsManagement = () => {
     } catch (error) {
       console.error('Export Word error:', error);
       toast.error('Gagal export laporan Word');
+    }
+  };
+
+  // Export to CSV
+  const exportToCSV = async (event) => {
+    try {
+      toast.info('Mengambil data laporan...');
+      
+      const { registrations, payments } = await fetchEventReportData(event.id);
+      
+      // Calculate totals
+      const totalRevenue = payments
+        .filter(p => p.status === 'success' || p.status === 'confirmed')
+        .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+      const totalAttended = registrations.filter(r => r.attendance_status === 'attended').length;
+      
+      // Helper function to escape CSV fields
+      const escapeCSV = (field) => {
+        if (field === null || field === undefined) return '';
+        const str = String(field);
+        // If field contains comma, newline, or quote, wrap in quotes and escape quotes
+        if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+      
+      // Build CSV content
+      let csvContent = '';
+      
+      // Header Section
+      csvContent += 'LAPORAN EVENT\n\n';
+      csvContent += `Nama Event,${escapeCSV(event.title)}\n`;
+      csvContent += `Tanggal Event,${escapeCSV(new Date(event.event_date).toLocaleDateString('id-ID'))}\n`;
+      csvContent += `Lokasi,${escapeCSV(event.location || '-')}\n`;
+      csvContent += `Kategori,${escapeCSV(event.category_name || '-')}\n\n`;
+      
+      // Summary Section
+      csvContent += 'RINGKASAN\n';
+      csvContent += `Total Peserta Terdaftar,${registrations.length}\n`;
+      csvContent += `Total Peserta Hadir,${totalAttended}\n`;
+      csvContent += `Total Pendapatan,Rp ${totalRevenue.toLocaleString('id-ID')}\n`;
+      csvContent += `Harga Tiket,${event.is_free ? 'GRATIS' : `Rp ${(event.price || 0).toLocaleString('id-ID')}`}\n\n`;
+      
+      // Participant Data Header
+      csvContent += 'DAFTAR PESERTA\n';
+      csvContent += 'No,Nama Peserta,Email,No. HP,Status Registrasi,Status Kehadiran,Tanggal Daftar,Jumlah Bayar\n';
+      
+      // Participant Data Rows
+      registrations.forEach((reg, index) => {
+        const payment = payments.find(p => p.user_id === reg.user_id);
+        const row = [
+          index + 1,
+          escapeCSV(reg.user_name || reg.full_name || '-'),
+          escapeCSV(reg.user_email || reg.email || '-'),
+          escapeCSV(reg.user_phone || reg.phone || '-'),
+          escapeCSV(reg.status || 'pending'),
+          escapeCSV(reg.attendance_status || 'not_attended'),
+          escapeCSV(reg.created_at ? new Date(reg.created_at).toLocaleDateString('id-ID') : '-'),
+          escapeCSV(payment ? `Rp ${parseFloat(payment.amount || 0).toLocaleString('id-ID')}` : 'Rp 0')
+        ];
+        csvContent += row.join(',') + '\n';
+      });
+      
+      // Footer
+      csvContent += `\nDibuat pada,${escapeCSV(new Date().toLocaleString('id-ID'))}\n`;
+      
+      // Create Blob and download
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const filename = `Laporan_${event.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+      
+      saveAs(blob, filename);
+      toast.success('Laporan CSV berhasil didownload!');
+      
+    } catch (error) {
+      console.error('Export CSV error:', error);
+      toast.error('Gagal export laporan CSV');
     }
   };
 
@@ -633,7 +881,10 @@ const EventsManagement = () => {
     setShowCertificatePreview(true);
   };
 
-  const filteredEvents = events.filter(event =>
+  // Filter events based on active tab
+  const displayEvents = activeTab === 'active' ? events : archivedEvents;
+  
+  const filteredEvents = displayEvents.filter(event =>
     event.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -748,6 +999,51 @@ const EventsManagement = () => {
                 </svg>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Tabs and Archive Button */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-8">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('active')}
+                className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                  activeTab === 'active'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Active Events ({events.length})
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('archived')}
+                className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                  activeTab === 'archived'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Archive className="w-4 h-4" />
+                  Archived Events ({archivedEvents.length})
+                </div>
+              </button>
+            </div>
+            
+            {activeTab === 'active' && (
+              <button
+                onClick={handleManualArchive}
+                className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all"
+                title="Archive events yang sudah berakhir lebih dari 1 bulan"
+              >
+                <Clock className="w-4 h-4" />
+                Auto Archive Now
+              </button>
+            )}
           </div>
         </div>
 
@@ -877,6 +1173,21 @@ const EventsManagement = () => {
                         Edit
                       </Link>
 
+                      {/* View Participants */}
+                      <button
+                        onClick={() => openParticipantsModal(event)}
+                        className="group/btn flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-600 hover:text-teal-700 px-4 py-2 rounded-lg transition-all duration-200 font-medium"
+                        title="Lihat data peserta event ini"
+                      >
+                        <Users className="w-4 h-4" />
+                        Peserta
+                        {event.approved_registrations !== undefined && (
+                          <span className="ml-1 rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-700">
+                            {event.approved_registrations}
+                          </span>
+                        )}
+                      </button>
+
                       {/* Highlight Event Button */}
                       <button
                         onClick={() => handleToggleHighlight(event.id, event.is_highlighted)}
@@ -927,6 +1238,17 @@ const EventsManagement = () => {
                                 <div className="text-xs text-gray-500">Laporan format dokumen</div>
                               </div>
                             </button>
+                            
+                            <button
+                              onClick={() => exportToCSV(event)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-orange-50 rounded-lg transition-all group/item"
+                            >
+                              <File className="w-5 h-5 text-orange-600" />
+                              <div>
+                                <div className="font-semibold text-gray-900 text-sm group-hover/item:text-orange-600">CSV (.csv)</div>
+                                <div className="text-xs text-gray-500">Data untuk spreadsheet</div>
+                              </div>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -960,6 +1282,27 @@ const EventsManagement = () => {
                         </>
                       )}
                       
+                      {/* Archive/Restore Button - Conditional based on tab */}
+                      {activeTab === 'active' ? (
+                        <button
+                          onClick={() => setArchiveConfirm({ show: true, eventId: event.id, action: 'archive' })}
+                          className="group/btn flex items-center gap-2 bg-orange-50 hover:bg-orange-100 text-orange-600 hover:text-orange-700 px-4 py-2 rounded-lg transition-all duration-200 font-medium"
+                          title="Arsipkan event ini"
+                        >
+                          <Archive className="w-4 h-4" />
+                          Archive
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setArchiveConfirm({ show: true, eventId: event.id, action: 'restore' })}
+                          className="group/btn flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 px-4 py-2 rounded-lg transition-all duration-200 font-medium"
+                          title="Pulihkan event ini"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          Restore
+                        </button>
+                      )}
+                      
                       <button
                         onClick={() => handleDeleteEvent(event.id)}
                         className="group/btn flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 px-4 py-2 rounded-lg transition-all duration-200 font-medium"
@@ -977,6 +1320,138 @@ const EventsManagement = () => {
           </div>
         )}
       </div>
+
+      {participantsModal.show && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 py-6">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-teal-600" />
+                  Data Peserta
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  {participantsModal.event?.title || 'Event'} ·{' '}
+                  {participantsModal.loading
+                    ? 'memuat data...'
+                    : `${participantsModal.participants.length} peserta`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeParticipantsModal}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200"
+              >
+                <span className="text-xl">&times;</span>
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+              {participantsModal.loading ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <div className="mb-3 h-10 w-10 animate-spin rounded-full border-4 border-teal-500 border-t-transparent"></div>
+                  Memuat data peserta...
+                </div>
+              ) : participantsModal.participants.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 py-16 text-center text-gray-500">
+                  <Users className="mb-3 h-10 w-10" />
+                  <p className="font-semibold text-gray-700">Belum ada peserta terdaftar</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Pendaftaran event ini belum menerima data peserta.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Peserta
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Kontak
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Daftar Pada
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {participantsModal.participants.map((participant) => (
+                        <tr key={participant.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-gray-900">
+                              {participant.full_name ||
+                                participant.user_name ||
+                                'Peserta'}
+                            </p>
+                            {participant.institution && (
+                              <p className="text-xs text-gray-500">
+                                {participant.institution}
+                              </p>
+                            )}
+                            {participant.address && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                {participant.address}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            <div>{participant.email || participant.user_email || '-'}</div>
+                            <div className="text-xs text-gray-500">
+                              {participant.phone || participant.user_phone || '-'}
+                            </div>
+                            {(participant.city || participant.province) && (
+                              <div className="text-xs text-gray-400">
+                                {[participant.city, participant.province].filter(Boolean).join(', ')}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div
+                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                                participant.status === 'confirmed'
+                                  ? 'bg-green-100 text-green-700'
+                                  : participant.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : participant.status === 'cancelled'
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {participant.status || 'pending'}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              Pembayaran:{' '}
+                              <span className="font-semibold text-gray-700">
+                                {participant.payment_status || 'pending'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {participant.created_at
+                              ? new Date(participant.created_at).toLocaleString('id-ID', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Event Full Page Form */}
       {showCreateForm && (
@@ -1736,7 +2211,7 @@ const EventsManagement = () => {
                       {/* Signature */}
                       <div className="text-center">
                         <div className="border-t-2 border-gray-300 pt-2">
-                          <p className="text-sm font-semibold text-gray-900">EventHub Platform</p>
+                          <p className="text-sm font-semibold text-gray-900">Event Yukk Platform</p>
                           <p className="text-xs text-gray-600 mt-1">Authorized Signature</p>
                         </div>
                       </div>
@@ -1748,7 +2223,7 @@ const EventsManagement = () => {
                         Certificate ID: CERT-{selectedEventForCert.id}-XXXX-XXXX
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        Verify at: https://eventhub.com/verify
+                        Verify at: https://eventyukk.com/verify
                       </p>
                     </div>
                   </div>
@@ -1818,6 +2293,28 @@ const EventsManagement = () => {
         confirmText="Ya, Generate"
         cancelText="Batal"
         type="info"
+      />
+
+      {/* Archive/Restore Confirmation Modal */}
+      <ConfirmModal
+        isOpen={archiveConfirm.show}
+        onClose={() => setArchiveConfirm({ show: false, eventId: null, action: 'archive' })}
+        onConfirm={() => {
+          if (archiveConfirm.action === 'archive') {
+            handleArchiveEvent(archiveConfirm.eventId);
+          } else {
+            handleRestoreEvent(archiveConfirm.eventId);
+          }
+        }}
+        title={archiveConfirm.action === 'archive' ? 'Archive Event' : 'Restore Event'}
+        message={
+          archiveConfirm.action === 'archive'
+            ? 'Event akan diarsipkan dan tidak muncul di public listing. Data history dan certificate tetap tersimpan. Anda bisa restore kapan saja.'
+            : 'Event akan dipulihkan dan kembali muncul di public listing.'
+        }
+        confirmText={archiveConfirm.action === 'archive' ? 'Ya, Archive' : 'Ya, Restore'}
+        cancelText="Batal"
+        type={archiveConfirm.action === 'archive' ? 'warning' : 'info'}
       />
     </div>
   );

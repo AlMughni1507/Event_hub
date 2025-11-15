@@ -20,8 +20,15 @@ const BlogManagement = () => {
     excerpt: '',
     featured_image: '',
     status: 'draft',
-    tags: ''
+    tags: '',
+    category: 'general'
   });
+  const categoryOptions = [
+    { value: 'general', label: 'Umum' },
+    { value: 'tips', label: 'Tips & Trik' },
+    { value: 'news', label: 'Berita' },
+    { value: 'event-update', label: 'Update Event' }
+  ];
 
   useEffect(() => {
     fetchBlogs();
@@ -67,7 +74,8 @@ const BlogManagement = () => {
       excerpt: blog.excerpt || '',
       featured_image: blog.featured_image || '',
       status: blog.status,
-      tags: blog.tags || ''
+      tags: blog.tags || '',
+      category: blog.category || 'general'
     });
     if (blog.featured_image) {
       setImagePreview(blog.featured_image);
@@ -109,7 +117,8 @@ const BlogManagement = () => {
       excerpt: '',
       featured_image: '',
       status: 'draft',
-      tags: ''
+      tags: '',
+      category: 'general'
     });
     setImagePreview(null);
   };
@@ -148,6 +157,11 @@ const BlogManagement = () => {
       default:
         return 'bg-blue-100 text-blue-700 border border-blue-200';
     }
+  };
+
+  const getCategoryLabel = (value) => {
+    const option = categoryOptions.find((opt) => opt.value === value);
+    return option ? option.label : 'Umum';
   };
 
   return (
@@ -315,8 +329,16 @@ const BlogManagement = () => {
 
                   {/* Blog Content */}
                   <div className="flex-1">
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start justify-between mb-3 gap-4">
                       <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${getStatusColor(blog.status)}`}>
+                            {blog.status}
+                          </span>
+                          <span className="px-3 py-1 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                            {getCategoryLabel(blog.category)}
+                          </span>
+                        </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors line-clamp-1">
                           {blog.title}
                         </h3>
@@ -326,9 +348,6 @@ const BlogManagement = () => {
                           </p>
                         )}
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ml-4 ${getStatusColor(blog.status)}`}>
-                        {blog.status}
-                      </span>
                     </div>
 
                     {/* Tags */}
@@ -479,12 +498,28 @@ const BlogManagement = () => {
 
                 {/* Right Column - Settings & Preview */}
                 <div className="space-y-6">
+                  {/* Category */}
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Kategori</label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                      {categoryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Status */}
                   <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Status Publikasi</label>
                     <select
                       value={formData.status}
-                      onChange={(e) => setFormData({...formData, status: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
                       <option value="draft">Draft</option>

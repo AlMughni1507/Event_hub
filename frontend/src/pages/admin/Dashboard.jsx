@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Users, Ticket, BarChart3, Plus, FolderPlus, FileText } from 'lucide-react';
-import { adminAPI, categoriesAPI } from '../../services/api';
+import { Calendar, Users, Ticket, BarChart3, FolderPlus, ClipboardList, TrendingUp, Sparkles, Activity, LayoutList } from 'lucide-react';
+import { adminAPI, categoriesAPI, analyticsAPI } from '../../services/api';
+import BarChart from '../../components/charts/BarChart';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -14,11 +15,22 @@ const Dashboard = () => {
     recentEvents: [],
     recentRegistrations: []
   });
+  const [chartsData, setChartsData] = useState({
+    monthlyEvents: [],
+    monthlyParticipants: [],
+    topEvents: []
+  });
   const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     fetchDashboardData();
+    fetchChartsData();
   }, []);
+
+  useEffect(() => {
+    fetchChartsData();
+  }, [selectedYear]);
 
   const fetchDashboardData = async () => {
     try {
@@ -94,16 +106,32 @@ const Dashboard = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon, color, trend }) => (
-    <div className="bg-white p-6 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-600 text-sm font-medium">{title}</p>
-          <p className="text-3xl font-bold text-black">{value}</p>
-        </div>
-        <div className="text-4xl">
-          {icon}
-        </div>
+  const fetchChartsData = async () => {
+    try {
+      const [monthlyEventsRes, monthlyParticipantsRes, topEventsRes] = await Promise.all([
+        analyticsAPI.getMonthlyEvents({ year: selectedYear }),
+        analyticsAPI.getMonthlyParticipants({ year: selectedYear }),
+        analyticsAPI.getTopEvents()
+      ]);
+
+      setChartsData({
+        monthlyEvents: monthlyEventsRes.data?.monthlyEvents || [],
+        monthlyParticipants: monthlyParticipantsRes.data?.monthlyParticipants || [],
+        topEvents: topEventsRes.data?.topEvents || []
+      });
+    } catch (error) {
+      console.error('❌ Error fetching charts data:', error);
+    }
+  };
+
+  const StatCard = ({ title, value, icon: Icon, accent = 'blue' }) => (
+    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+      <div className={`p-3 rounded-lg bg-${accent}-50 text-${accent}-600`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-wide text-gray-500">{title}</p>
+        <p className="text-2xl font-semibold text-gray-900">{value}</p>
       </div>
     </div>
   );
@@ -121,54 +149,117 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-white p-8 rounded-lg border border-gray-200 shadow-sm">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-4xl font-bold text-black mb-4">
-            Welcome to Mission Control
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Your dashboard for managing the EventHub platform. All systems operational.
-          </p>
+          <p className="text-sm text-gray-500 uppercase tracking-wide mb-1">Dashboard</p>
+          <h1 className="text-3xl font-semibold text-gray-900">Ringkasan Aktivitas</h1>
+          <p className="text-gray-600 mt-2">Monitor event, peserta, dan performa platform secara singkat.</p>
+        </div>
+        <div className="mt-4 md:mt-0 flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg">
+            <Sparkles className="w-4 h-4 text-indigo-500" />
+            <span className="text-sm text-gray-600">Tahun</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="text-sm font-semibold text-gray-900 bg-transparent focus:outline-none"
+            >
+              {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => navigate('/admin/events')}
+            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-semibold hover:bg-gray-800 transition-colors"
+          >
+            <Calendar className="w-4 h-4" />
+            Buat Event
+          </button>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Events"
-          value={stats.totalEvents}
-          icon={<Calendar className="w-8 h-8 text-blue-600" />}
-          trend={12}
-        />
-        <StatCard
-          title="Active Events"
-          value={stats.activeEvents}
-          icon={<Calendar className="w-8 h-8 text-green-600" />}
-          trend={8}
-        />
-        <StatCard
-          title="Total Users"
-          value={stats.totalUsers}
-          icon={<Users className="w-8 h-8 text-purple-600" />}
-          trend={15}
-        />
-        <StatCard
-          title="Registrations"
-          value={stats.totalRegistrations}
-          icon={<Ticket className="w-8 h-8 text-orange-600" />}
-          trend={10}
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Total Event" value={stats.totalEvents} icon={Calendar} accent="blue" />
+        <StatCard title="Event Aktif" value={stats.activeEvents} icon={Activity} accent="green" />
+        <StatCard title="Total Peserta" value={stats.totalUsers} icon={Users} accent="purple" />
+        <StatCard title="Registrasi" value={stats.totalRegistrations} icon={Ticket} accent="orange" />
       </div>
 
-      {/* Secondary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <StatCard
-          title="Categories"
-          value={stats.totalCategories}
-          icon={<FolderPlus className="w-8 h-8 text-pink-600" />}
-          trend={5}
-        />
+      {/* Secondary stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Kategori" value={stats.totalCategories} icon={FolderPlus} accent="pink" />
+        <StatCard title="Event terbaru" value={stats.recentEvents.length} icon={LayoutList} accent="indigo" />
+        <StatCard title="Aktivitas terbaru" value={stats.recentRegistrations.length} icon={ClipboardList} accent="cyan" />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+              <BarChart3 className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Performa Event</p>
+              <p className="text-base font-semibold text-gray-900">Event / Bulan</p>
+            </div>
+          </div>
+          <BarChart
+            data={chartsData.monthlyEvents.map(item => ({
+              label: item.month_name.substring(0, 3),
+              value: item.total_events
+            }))}
+            xAxisLabel="Bulan"
+            yAxisLabel="Event"
+            color="#2563eb"
+            height={260}
+          />
+        </div>
+        <div className="xl:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg bg-green-50 text-green-600">
+              <Users className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Daftar Hadir</p>
+              <p className="text-base font-semibold text-gray-900">Peserta / Bulan</p>
+            </div>
+          </div>
+          <BarChart
+            data={chartsData.monthlyParticipants.map(item => ({
+              label: item.month_name.substring(0, 3),
+              value: item.total_participants
+            }))}
+            xAxisLabel="Bulan"
+            yAxisLabel="Peserta"
+            color="#059669"
+            height={260}
+          />
+        </div>
+        <div className="xl:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">10 Event Teratas</p>
+              <p className="text-base font-semibold text-gray-900">Peserta Terbanyak</p>
+            </div>
+          </div>
+          <BarChart
+            data={chartsData.topEvents.map(item => ({
+              label: item.title.length > 15 ? `${item.title.slice(0, 12)}…` : item.title,
+              value: item.participant_count
+            }))}
+            xAxisLabel="Event"
+            yAxisLabel="Peserta"
+            color="#7c3aed"
+            height={260}
+          />
+        </div>
       </div>
 
       {/* Recent Activity */}

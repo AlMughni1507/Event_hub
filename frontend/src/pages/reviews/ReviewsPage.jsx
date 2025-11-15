@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import Footer from '../../components/Footer';
 import { Star, Send, ArrowLeft, Sparkles, TrendingUp, Award, MessageSquare, Quote } from 'lucide-react';
-import api from '../../services/api';
+import { reviewsAPI } from '../../services/api';
 
 const ReviewsPage = () => {
   const navigate = useNavigate();
@@ -14,6 +14,8 @@ const ReviewsPage = () => {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [existingReview, setExistingReview] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
   
   const [formData, setFormData] = useState({
     rating: 5,
@@ -32,8 +34,22 @@ const ReviewsPage = () => {
 
   const fetchReviews = async () => {
     try {
-      const response = await api.get('/reviews');
-      setReviews(response.data.reviews || response.data || []);
+      const response = await reviewsAPI.getAll();
+      const allReviews = response.reviews || response.data || response || [];
+      setReviews(Array.isArray(allReviews) ? allReviews : []);
+      
+      // Check if user already has a review
+      if (user) {
+        const userReview = allReviews.find(r => r.user_id === user.id);
+        if (userReview) {
+          setExistingReview(userReview);
+          setFormData({
+            rating: userReview.rating,
+            comment: userReview.comment,
+            full_name: userReview.full_name
+          });
+        }
+      }
     } catch (error) {
       console.error('Error fetching reviews:', error);
     } finally {
@@ -51,25 +67,35 @@ const ReviewsPage = () => {
 
     setSubmitting(true);
     try {
-      await api.post('/reviews', {
-        ...formData,
-        user_id: user.id
-      });
-      
-      toast.success('Ulasan berhasil dikirim! Terima kasih atas feedback Anda');
-      
-      // Reset form
-      setFormData({
-        rating: 5,
-        comment: '',
-        full_name: user?.full_name || ''
-      });
+      if (existingReview) {
+        // Update existing review
+        await reviewsAPI.update(existingReview.id, {
+          ...formData,
+          user_id: user.id
+        });
+        toast.success('Ulasan berhasil diperbarui! Terima kasih atas feedback Anda');
+      } else {
+        // Create new review
+        await reviewsAPI.create({
+          ...formData,
+          user_id: user.id
+        });
+        toast.success('Ulasan berhasil dikirim! Terima kasih atas feedback Anda');
+      }
       
       // Refresh reviews
       fetchReviews();
+      setIsEditing(false);
     } catch (error) {
-      toast.error('Gagal mengirim ulasan. Silakan coba lagi');
       console.error('Error submitting review:', error);
+      const errorMessage = error?.message || error?.error || 'Gagal mengirim ulasan. Silakan coba lagi';
+      
+      // Check if user already submitted a review
+      if (errorMessage.includes('already submitted') || errorMessage.includes('already')) {
+        toast.error('Anda sudah pernah memberikan ulasan. Silakan gunakan tombol "Edit Ulasan" untuk mengubahnya.');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -110,6 +136,37 @@ const ReviewsPage = () => {
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+          {/* Floating particles */}
+          {[...Array(25)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full bg-white/20"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                width: `${3 + Math.random() * 5}px`,
+                height: `${3 + Math.random() * 5}px`,
+                animation: `float ${4 + Math.random() * 3}s ease-in-out infinite`,
+                animationDelay: `${Math.random() * 2}s`
+              }}
+            ></div>
+          ))}
+          {/* Rotating gradient orbs */}
+          {[...Array(3)].map((_, i) => (
+            <div
+              key={`orb-${i}`}
+              className="absolute rounded-full blur-3xl"
+              style={{
+                left: `${30 + i * 25}%`,
+                top: `${30 + i * 20}%`,
+                width: `${150 + i * 80}px`,
+                height: `${150 + i * 80}px`,
+                background: `radial-gradient(circle, rgba(147,51,234,0.3), rgba(236,72,153,0.2))`,
+                animation: `rotate ${20 + i * 10}s linear infinite`,
+                animationDelay: `${i * 3}s`
+              }}
+            ></div>
+          ))}
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -171,6 +228,21 @@ const ReviewsPage = () => {
             <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
               <h2 className="font-bebas text-3xl text-gray-900 mb-6">Tulis Ulasan Anda</h2>
               
+              {/* Existing Review Notice */}
+              {existingReview && (
+                <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <MessageSquare className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-blue-900">Anda sudah memberikan ulasan</p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Anda dapat mengedit ulasan Anda di bawah ini. Perubahan akan langsung tersimpan.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Name */}
                 <div>
@@ -228,7 +300,7 @@ const ReviewsPage = () => {
                     onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
                     rows="6"
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-poppins resize-none"
-                    placeholder="Ceritakan pengalaman Anda menggunakan EventHub..."
+                    placeholder="Ceritakan pengalaman Anda menggunakan Event Yukk..."
                     required
                     minLength="10"
                   />
@@ -247,6 +319,11 @@ const ReviewsPage = () => {
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       <span>Mengirim...</span>
+                    </>
+                  ) : existingReview ? (
+                    <>
+                      <Send className="w-5 h-5" />
+                      <span>Perbarui Ulasan</span>
                     </>
                   ) : (
                     <>
@@ -370,8 +447,16 @@ const ReviewsPage = () => {
 
       <Footer />
 
-      {/* Custom Scrollbar Styles */}
+      {/* Custom Scrollbar Styles & Animations */}
       <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        @keyframes rotate {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Mail, Lock, User, Phone, ArrowLeft, Calendar, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Phone, ArrowLeft, Calendar, Eye, EyeOff, ArrowRight, MapPin, GraduationCap } from 'lucide-react';
 import { authAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -13,7 +13,9 @@ const RegisterPage = () => {
     password: '',
     confirmPassword: '',
     full_name: '',
-    phone: ''
+    phone: '',
+    address: '',
+    education: ''
   });
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -125,8 +127,17 @@ const RegisterPage = () => {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setMessage('Password minimal 6 karakter');
+    // Password complexity validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      setMessage(
+        'Password harus minimal 8 karakter dan mengandung:\n' +
+        '• Huruf besar (A-Z)\n' +
+        '• Huruf kecil (a-z)\n' +
+        '• Angka (0-9)\n' +
+        '• Karakter spesial (@$!%*?&#)\n' +
+        'Contoh: Password123#'
+      );
       return;
     }
 
@@ -139,8 +150,9 @@ const RegisterPage = () => {
         email: formData.email,
         password: formData.password,
         full_name: formData.full_name,
-        phone: formData.phone || '',
-        education: formData.education || ''
+        phone: formData.phone,
+        address: formData.address,
+        education: formData.education
       });
       
       if (response && response.success) {
@@ -199,7 +211,7 @@ const RegisterPage = () => {
         
         if (response.data.user && response.data.token) {
           login(response.data.user, response.data.token);
-          setMessage('Verifikasi berhasil! Selamat datang di EventHub!');
+          setMessage('Verifikasi berhasil! Selamat datang di Event Yukk!');
           setTimeout(() => {
             navigate('/');
           }, 2000);
@@ -295,7 +307,7 @@ const RegisterPage = () => {
                 <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
                   <Calendar className="w-7 h-7 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold text-white">EventHub</h1>
+                <h1 className="text-2xl font-bold text-white">Event Yukk</h1>
               </div>
               <h1 className="text-5xl font-bebas font-black mb-4 text-white leading-tight">EMAIL VERIFICATION</h1>
               <p className="text-xl text-gray-300 font-poppins">Final step to activate your account</p>
@@ -430,7 +442,7 @@ const RegisterPage = () => {
         <div className="w-full max-w-md bg-white/10 backdrop-blur-md rounded-2xl p-8 shadow-2xl border border-pink-500/20">
           <div className="text-center mb-8">
             <h2 className="text-4xl font-bebas font-black text-white mb-2">SIGN UP</h2>
-            <p className="text-gray-300 font-poppins">Create your EventHub account</p>
+            <p className="text-gray-300 font-poppins">Create your Event Yukk account</p>
           </div>
           {message && (
             <div className={`p-4 rounded-lg mb-6 ${
@@ -499,6 +511,41 @@ const RegisterPage = () => {
                   className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all font-poppins"
                   placeholder="Phone (Optional)"
                 />
+              </div>
+            </div>
+            <div>
+              <div className="relative">
+                <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-pink-400" />
+                <textarea
+                  id="address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  rows="2"
+                  className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all font-poppins resize-none"
+                  placeholder="Alamat Tempat Tinggal (Optional)"
+                />
+              </div>
+            </div>
+            <div>
+              <div className="relative">
+                <GraduationCap className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-pink-400" />
+                <select
+                  id="education"
+                  name="education"
+                  value={formData.education}
+                  onChange={handleInputChange}
+                  className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all font-poppins appearance-none"
+                >
+                  <option value="" className="bg-purple-900">Pilih Pendidikan Terakhir (Optional)</option>
+                  <option value="SD" className="bg-purple-900">SD / Sederajat</option>
+                  <option value="SMP" className="bg-purple-900">SMP / Sederajat</option>
+                  <option value="SMA" className="bg-purple-900">SMA / Sederajat</option>
+                  <option value="D3" className="bg-purple-900">D3 (Diploma)</option>
+                  <option value="S1" className="bg-purple-900">S1 (Sarjana)</option>
+                  <option value="S2" className="bg-purple-900">S2 (Magister)</option>
+                  <option value="S3" className="bg-purple-900">S3 (Doktor)</option>
+                </select>
               </div>
             </div>
             <div>
@@ -583,9 +630,9 @@ const RegisterPage = () => {
               <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
                 <Calendar className="w-7 h-7 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-white">EventHub</h1>
+              <h1 className="text-2xl font-bold text-white">Event Yukk</h1>
             </div>
-            <h1 className="text-5xl font-bebas font-black mb-4 text-white leading-tight">JOIN EVENTHUB</h1>
+            <h1 className="text-5xl font-bebas font-black mb-4 text-white leading-tight">JOIN EVENT YUKK</h1>
             <p className="text-xl text-gray-300 font-poppins">Temukan dan ikuti event menarik di seluruh Indonesia</p>
           </div>
         </div>

@@ -6,7 +6,8 @@ import { motion } from 'framer-motion';
 import { 
   User, Mail, Phone, Calendar, Shield, Award, 
   Ticket, Edit2, Save, X, Camera, Lock, Eye, EyeOff,
-  TrendingUp, CheckCircle, Clock, Upload
+  TrendingUp, CheckCircle, Clock, Upload, Palette, Download, 
+  MapPin, Clock as ClockIcon, Users, FileText, RotateCcw, Mail as MailIcon
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -21,6 +22,22 @@ const SettingsPage = () => {
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [showCertificatePreview, setShowCertificatePreview] = useState(false);
+  const [showCertificateEditor, setShowCertificateEditor] = useState(false);
+  const [editingCertificate, setEditingCertificate] = useState(null);
+  const [certificateCustomization, setCertificateCustomization] = useState({
+    title: 'CERTIFICATE',
+    subtitle: 'OF ACHIEVEMENT',
+    presentedText: 'This certificate is proudly presented to',
+    content: '',
+    footer: 'Diterbitkan pada',
+    backgroundColor: '#fefefe',
+    primaryColor: '#1a1a1a',
+    accentColor: '#d4af37',
+    textColor: '#4a4a4a',
+    titleFontSize: 64,
+    nameFontSize: 48,
+    contentFontSize: 16
+  });
   const [activeTab, setActiveTab] = useState('profile'); // profile, certificates, events
   
   // Edit mode states
@@ -37,14 +54,15 @@ const SettingsPage = () => {
     phone: ''
   });
   
-  // Password change
+  // Password change with OTP
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [passwordData, setPasswordData] = useState({
-    current_password: '',
+    otp: '',
     new_password: '',
     confirm_password: ''
   });
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -142,37 +160,74 @@ const SettingsPage = () => {
     }
   };
 
-  // Change password
+  // Request OTP for password change
+  const handleRequestOTP = async () => {
+    try {
+      setOtpLoading(true);
+      const response = await api.post('/users/request-password-otp');
+      
+      if (response.data.success) {
+        setOtpRequested(true);
+        toast.success('OTP telah dikirim ke email Anda. Silakan cek email Anda.');
+      }
+    } catch (error) {
+      console.error('Request OTP error:', error);
+      toast.error(error.response?.data?.message || 'Gagal mengirim OTP');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // Change password with OTP
   const handleChangePassword = async () => {
+    if (!otpRequested) {
+      toast.error('Silakan request OTP terlebih dahulu');
+      return;
+    }
+
+    if (!passwordData.otp) {
+      toast.error('Masukkan kode OTP');
+      return;
+    }
+
     if (passwordData.new_password !== passwordData.confirm_password) {
-      toast.error('New passwords do not match');
+      toast.error('Password baru dan konfirmasi password tidak cocok');
       return;
     }
     
-    if (passwordData.new_password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    if (passwordData.new_password.length < 8) {
+      toast.error('Password minimal 8 karakter');
+      return;
+    }
+
+    // Validate password strength
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!passwordRegex.test(passwordData.new_password)) {
+      toast.error('Password harus mengandung minimal 8 karakter dengan huruf besar, huruf kecil, angka, dan karakter spesial');
       return;
     }
 
     try {
       setIsSaving(true);
       const response = await api.put('/users/change-password', {
-        current_password: passwordData.current_password,
-        new_password: passwordData.new_password
+        otp: passwordData.otp,
+        new_password: passwordData.new_password,
+        confirm_password: passwordData.confirm_password
       });
 
       if (response.data.success) {
         setShowPasswordChange(false);
+        setOtpRequested(false);
         setPasswordData({
-          current_password: '',
+          otp: '',
           new_password: '',
           confirm_password: ''
         });
-        toast.success('Password changed successfully!');
+        toast.success('Password berhasil diubah!');
       }
     } catch (error) {
       console.error('Change password error:', error);
-      toast.error(error.response?.data?.message || 'Failed to change password');
+      toast.error(error.response?.data?.message || 'Gagal mengubah password');
     } finally {
       setIsSaving(false);
     }
@@ -209,8 +264,8 @@ const SettingsPage = () => {
   const fetchRegistrations = async () => {
     try {
       setLoadingRegistrations(true);
-      const response = await registrationsAPI.getMyRegistrations();
-      setRegistrations(response.data || []);
+      const response = await api.get('/registrations/my-registrations');
+      setRegistrations(response.data?.data?.registrations || []);
     } catch (error) {
       console.error('Error fetching registrations:', error);
       setRegistrations([]);
@@ -225,10 +280,53 @@ const SettingsPage = () => {
     setShowCertificatePreview(true);
   };
 
-  const handleDownloadCertificate = (certificate) => {
-    // Mock download functionality
-    console.log('Downloading certificate:', certificate.certificateId);
-    // In real implementation, this would trigger a download
+  const handleEditCertificate = (certificate) => {
+    setEditingCertificate(certificate);
+    // Load existing customization if available
+    if (certificate.customization) {
+      setCertificateCustomization(JSON.parse(certificate.customization));
+    }
+    setShowCertificateEditor(true);
+  };
+
+  const handleSaveCertificateCustomization = async () => {
+    try {
+      setIsSaving(true);
+      const response = await certificatesAPI.update(editingCertificate.id, {
+        customization: JSON.stringify(certificateCustomization)
+      });
+      
+      if (response.data.success) {
+        toast.success('Sertifikat berhasil disesuaikan!');
+        setShowCertificateEditor(false);
+        setEditingCertificate(null);
+        fetchCertificates(); // Refresh certificates
+      }
+    } catch (error) {
+      console.error('Error saving certificate customization:', error);
+      toast.error('Gagal menyimpan penyesuaian sertifikat');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownloadCertificate = async (certificate) => {
+    try {
+      const response = await api.get(`/certificates/${certificate.id}/download`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `certificate-${certificate.certificate_number}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Sertifikat berhasil diunduh!');
+    } catch (error) {
+      console.error('Error downloading certificate:', error);
+      toast.error('Gagal mengunduh sertifikat');
+    }
   };
 
   // Load data when user is authenticated
@@ -301,7 +399,7 @@ const SettingsPage = () => {
 
               <div className="mt-8 pt-6 border-t border-pink-500/30">
                 <p className="text-purple-300 text-sm">
-                  New to EventHub? Register as a visitor to discover and join amazing events!
+                  New to Event Yukk? Register as a visitor to discover and join amazing events!
                 </p>
               </div>
             </div>
@@ -626,101 +724,141 @@ const SettingsPage = () => {
 
                 {showPasswordChange ? (
                   <div className="space-y-4">
-                    {/* Current Password */}
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        Current Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showCurrentPassword ? "text" : "password"}
-                          name="current_password"
-                          value={passwordData.current_password}
-                          onChange={handlePasswordChange}
-                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all pr-12"
-                          placeholder="Enter current password"
-                        />
+                    {/* OTP Request */}
+                    {!otpRequested ? (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-900 mb-3">
+                          Untuk mengganti password, Anda perlu memverifikasi dengan kode OTP yang akan dikirim ke email Anda.
+                        </p>
                         <button
-                          type="button"
-                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          onClick={handleRequestOTP}
+                          disabled={otpLoading}
+                          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 font-medium flex items-center justify-center gap-2"
                         >
-                          {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          {otpLoading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                              Mengirim OTP...
+                            </>
+                          ) : (
+                            <>
+                              <MailIcon className="w-4 h-4" />
+                              Kirim Kode OTP ke Email
+                            </>
+                          )}
                         </button>
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        {/* OTP Input */}
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 mb-2 block">
+                            Kode OTP
+                          </label>
+                          <input
+                            type="text"
+                            name="otp"
+                            value={passwordData.otp}
+                            onChange={handlePasswordChange}
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-center text-2xl font-mono tracking-widest"
+                            placeholder="000000"
+                            maxLength="6"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Kode OTP telah dikirim ke email Anda. Berlaku selama 15 menit.
+                          </p>
+                          <button
+                            onClick={handleRequestOTP}
+                            disabled={otpLoading}
+                            className="text-xs text-purple-600 hover:text-purple-700 mt-2"
+                          >
+                            Kirim ulang OTP
+                          </button>
+                        </div>
+                      </>
+                    )}
 
-                    {/* New Password */}
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showNewPassword ? "text" : "password"}
-                          name="new_password"
-                          value={passwordData.new_password}
-                          onChange={handlePasswordChange}
-                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all pr-12"
-                          placeholder="Enter new password (min. 6 characters)"
-                        />
+                    {otpRequested && (
+                      <>
+                        {/* New Password */}
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 mb-2 block">
+                            Password Baru
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showNewPassword ? "text" : "password"}
+                              name="new_password"
+                              value={passwordData.new_password}
+                              onChange={handlePasswordChange}
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all pr-12"
+                              placeholder="Min. 8 karakter: huruf besar, kecil, angka, karakter spesial"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowNewPassword(!showNewPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                            >
+                              {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Password harus minimal 8 karakter dengan huruf besar, huruf kecil, angka, dan karakter spesial (contoh: Password123#)
+                          </p>
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 mb-2 block">
+                            Konfirmasi Password Baru
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showConfirmPassword ? "text" : "password"}
+                              name="confirm_password"
+                              value={passwordData.confirm_password}
+                              onChange={handlePasswordChange}
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all pr-12"
+                              placeholder="Ulangi password baru"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                            >
+                              {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {otpRequested && (
+                      <div className="flex gap-3 pt-2">
                         <button
-                          type="button"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          onClick={() => {
+                            setShowPasswordChange(false);
+                            setOtpRequested(false);
+                            setPasswordData({
+                              otp: '',
+                              new_password: '',
+                              confirm_password: ''
+                            });
+                          }}
+                          className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-medium"
+                          disabled={isSaving}
                         >
-                          {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          Batal
+                        </button>
+                        <button
+                          onClick={handleChangePassword}
+                          className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 font-medium"
+                          disabled={isSaving || !passwordData.otp || !passwordData.new_password}
+                        >
+                          {isSaving ? 'Mengubah...' : 'Ubah Password'}
                         </button>
                       </div>
-                    </div>
-
-                    {/* Confirm Password */}
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        Confirm New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          name="confirm_password"
-                          value={passwordData.confirm_password}
-                          onChange={handlePasswordChange}
-                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all pr-12"
-                          placeholder="Confirm new password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                        >
-                          {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3 pt-2">
-                      <button
-                        onClick={() => {
-                          setShowPasswordChange(false);
-                          setPasswordData({
-                            current_password: '',
-                            new_password: '',
-                            confirm_password: ''
-                          });
-                        }}
-                        className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-medium"
-                        disabled={isSaving}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleChangePassword}
-                        className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 font-medium"
-                        disabled={isSaving}
-                      >
-                        {isSaving ? 'Updating...' : 'Update Password'}
-                      </button>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -830,18 +968,27 @@ const SettingsPage = () => {
                           {cert.status}
                         </div>
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           onClick={() => handleViewCertificate(cert)}
-                          className="text-cyan-400 hover:text-cyan-300 text-sm font-medium"
+                          className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
                         >
+                          <Eye className="w-4 h-4" />
                           View
+                        </button>
+                        <button
+                          onClick={() => handleEditCertificate(cert)}
+                          className="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
+                        >
+                          <Palette className="w-4 h-4" />
+                          Customize
                         </button>
                         {cert.status === 'generated' && (
                           <button
                             onClick={() => handleDownloadCertificate(cert)}
-                            className="text-pink-400 hover:text-pink-300 text-sm font-medium"
+                            className="px-3 py-1.5 bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
                           >
+                            <Download className="w-4 h-4" />
                             Download
                           </button>
                         )}
@@ -865,12 +1012,21 @@ const SettingsPage = () => {
         {/* Events Tab */}
         {activeTab === 'events' && (
           <div className="bg-black/40 backdrop-blur-md rounded-2xl p-6 border-2 border-pink-500/30 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Event History
-            </h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center">
+                <svg className="w-5 h-5 mr-2 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Event History
+              </h3>
+              <button
+                onClick={() => navigate('/my-events')}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg flex items-center gap-2"
+              >
+                <Ticket className="w-4 h-4" />
+                Lihat Semua Event
+              </button>
+            </div>
             
             {loadingRegistrations ? (
               <div className="flex items-center justify-center py-8">
@@ -879,27 +1035,87 @@ const SettingsPage = () => {
             ) : registrations.length > 0 ? (
               <div className="space-y-4">
                 {registrations.map((reg) => (
-                  <div key={reg.id} className="bg-white/10 p-4 rounded-lg border border-pink-500/30 hover:bg-white/20 transition-colors">
-                    <div className="flex items-center justify-between">
+                  <div key={reg.id} className="bg-white/10 p-5 rounded-lg border border-pink-500/30 hover:bg-white/20 transition-all hover:border-pink-400/50">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex-1">
-                        <div className="text-white font-semibold">{reg.event_title}</div>
-                        <div className="text-purple-300 text-sm">
-                          {new Date(reg.event_date).toLocaleDateString()} • {reg.location}
+                        <div className="text-white font-bold text-lg mb-2">{reg.event_title}</div>
+                        <div className="space-y-1.5 text-sm">
+                          <div className="flex items-center gap-2 text-purple-300">
+                            <Calendar className="w-4 h-4" />
+                            {new Date(reg.event_date).toLocaleDateString('id-ID', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </div>
+                          {reg.event_time && (
+                            <div className="flex items-center gap-2 text-purple-300">
+                              <ClockIcon className="w-4 h-4" />
+                              {reg.event_time}
+                            </div>
+                          )}
+                          {reg.location && (
+                            <div className="flex items-center gap-2 text-purple-300">
+                              <MapPin className="w-4 h-4" />
+                              {reg.location}
+                            </div>
+                          )}
+                          {reg.payment_amount !== undefined && reg.payment_amount > 0 && (
+                            <div className="flex items-center gap-2 text-purple-300">
+                              <FileText className="w-4 h-4" />
+                              {new Intl.NumberFormat('id-ID', {
+                                style: 'currency',
+                                currency: 'IDR',
+                                minimumFractionDigits: 0
+                              }).format(reg.payment_amount)}
+                            </div>
+                          )}
                         </div>
-                        <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-2 ${
-                          reg.status === 'attended' ? 'bg-pink-500/30 text-pink-300' :
-                          reg.status === 'approved' ? 'bg-cyan-500/30 text-cyan-300' :
-                          reg.status === 'cancelled' ? 'bg-red-500/30 text-red-300' :
-                          'bg-purple-500/30 text-purple-300'
-                        }`}>
-                          {reg.status}
+                        <div className="flex items-center gap-2 mt-3">
+                          <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                            reg.status === 'attended' ? 'bg-green-500/30 text-green-300 border border-green-500/50' :
+                            reg.status === 'approved' ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-500/50' :
+                            reg.status === 'pending' ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/50' :
+                            reg.status === 'cancelled' ? 'bg-red-500/30 text-red-300 border border-red-500/50' :
+                            'bg-purple-500/30 text-purple-300 border border-purple-500/50'
+                          }`}>
+                            {reg.status === 'attended' ? '✓ Hadir' :
+                             reg.status === 'approved' ? '✓ Disetujui' :
+                             reg.status === 'pending' ? '⏳ Menunggu' :
+                             reg.status === 'cancelled' ? '✗ Dibatalkan' :
+                             reg.status}
+                          </div>
+                          {reg.payment_status && (
+                            <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                              reg.payment_status === 'paid' ? 'bg-green-500/30 text-green-300 border border-green-500/50' :
+                              reg.payment_status === 'pending' ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/50' :
+                              'bg-gray-500/30 text-gray-300 border border-gray-500/50'
+                            }`}>
+                              {reg.payment_status === 'paid' ? '✓ Lunas' :
+                               reg.payment_status === 'pending' ? '⏳ Menunggu Pembayaran' :
+                               'Belum Bayar'}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm text-purple-300">Registered</div>
-                        <div className="text-sm text-white">
-                          {new Date(reg.created_at).toLocaleDateString()}
+                      <div className="text-right space-y-1">
+                        <div className="text-xs text-purple-400 uppercase tracking-wide">Terdaftar</div>
+                        <div className="text-sm text-white font-medium">
+                          {new Date(reg.created_at).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
                         </div>
+                        {reg.attendance_token && (
+                          <div className="mt-2">
+                            <div className="text-xs text-purple-400 uppercase tracking-wide">Token</div>
+                            <div className="text-xs text-cyan-300 font-mono font-bold bg-cyan-500/20 px-2 py-1 rounded mt-1">
+                              {reg.attendance_token}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -923,6 +1139,320 @@ const SettingsPage = () => {
           </div>
         )}
 
+
+        {/* Certificate Editor Modal */}
+        {showCertificateEditor && editingCertificate && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-gradient-to-br from-purple-900 to-pink-900 rounded-2xl max-w-5xl w-full my-8 border-2 border-pink-500/50">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Palette className="w-6 h-6" />
+                    Customize Certificate
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowCertificateEditor(false);
+                      setEditingCertificate(null);
+                    }}
+                    className="text-pink-400 hover:text-pink-300 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Editor Controls */}
+                  <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <div className="bg-white/10 rounded-lg p-4 space-y-4">
+                      <h4 className="text-white font-semibold mb-3">Text Content</h4>
+                      
+                      <div>
+                        <label className="block text-sm text-purple-200 mb-1.5">Title</label>
+                        <input
+                          type="text"
+                          value={certificateCustomization.title}
+                          onChange={(e) => setCertificateCustomization({...certificateCustomization, title: e.target.value})}
+                          className="w-full px-3 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white placeholder-purple-300 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                          placeholder="CERTIFICATE"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-purple-200 mb-1.5">Subtitle</label>
+                        <input
+                          type="text"
+                          value={certificateCustomization.subtitle}
+                          onChange={(e) => setCertificateCustomization({...certificateCustomization, subtitle: e.target.value})}
+                          className="w-full px-3 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white placeholder-purple-300 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                          placeholder="OF ACHIEVEMENT"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-purple-200 mb-1.5">Presented Text</label>
+                        <input
+                          type="text"
+                          value={certificateCustomization.presentedText}
+                          onChange={(e) => setCertificateCustomization({...certificateCustomization, presentedText: e.target.value})}
+                          className="w-full px-3 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white placeholder-purple-300 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                          placeholder="This certificate is proudly presented to"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-purple-200 mb-1.5">Content</label>
+                        <textarea
+                          rows="3"
+                          value={certificateCustomization.content}
+                          onChange={(e) => setCertificateCustomization({...certificateCustomization, content: e.target.value})}
+                          className="w-full px-3 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white placeholder-purple-300 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 resize-none"
+                          placeholder="atas partisipasinya dalam [NAMA_EVENT]..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-purple-200 mb-1.5">Footer</label>
+                        <input
+                          type="text"
+                          value={certificateCustomization.footer}
+                          onChange={(e) => setCertificateCustomization({...certificateCustomization, footer: e.target.value})}
+                          className="w-full px-3 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white placeholder-purple-300 focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                          placeholder="Diterbitkan pada"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-white/10 rounded-lg p-4 space-y-4">
+                      <h4 className="text-white font-semibold mb-3">Typography</h4>
+                      
+                      <div>
+                        <label className="block text-sm text-purple-200 mb-2">
+                          Title Font Size: {certificateCustomization.titleFontSize}px
+                        </label>
+                        <input
+                          type="range"
+                          min="32"
+                          max="96"
+                          value={certificateCustomization.titleFontSize}
+                          onChange={(e) => setCertificateCustomization({...certificateCustomization, titleFontSize: parseInt(e.target.value)})}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-purple-200 mb-2">
+                          Name Font Size: {certificateCustomization.nameFontSize}px
+                        </label>
+                        <input
+                          type="range"
+                          min="32"
+                          max="72"
+                          value={certificateCustomization.nameFontSize}
+                          onChange={(e) => setCertificateCustomization({...certificateCustomization, nameFontSize: parseInt(e.target.value)})}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-purple-200 mb-2">
+                          Content Font Size: {certificateCustomization.contentFontSize}px
+                        </label>
+                        <input
+                          type="range"
+                          min="10"
+                          max="24"
+                          value={certificateCustomization.contentFontSize}
+                          onChange={(e) => setCertificateCustomization({...certificateCustomization, contentFontSize: parseInt(e.target.value)})}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-white/10 rounded-lg p-4 space-y-4">
+                      <h4 className="text-white font-semibold mb-3">Colors</h4>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm text-purple-200 mb-1.5">Primary Color</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={certificateCustomization.primaryColor}
+                              onChange={(e) => setCertificateCustomization({...certificateCustomization, primaryColor: e.target.value})}
+                              className="w-12 h-10 border border-pink-500/30 rounded-lg cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={certificateCustomization.primaryColor}
+                              onChange={(e) => setCertificateCustomization({...certificateCustomization, primaryColor: e.target.value})}
+                              className="flex-1 px-2 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm text-purple-200 mb-1.5">Accent Color</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={certificateCustomization.accentColor}
+                              onChange={(e) => setCertificateCustomization({...certificateCustomization, accentColor: e.target.value})}
+                              className="w-12 h-10 border border-pink-500/30 rounded-lg cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={certificateCustomization.accentColor}
+                              onChange={(e) => setCertificateCustomization({...certificateCustomization, accentColor: e.target.value})}
+                              className="flex-1 px-2 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm text-purple-200 mb-1.5">Text Color</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={certificateCustomization.textColor}
+                              onChange={(e) => setCertificateCustomization({...certificateCustomization, textColor: e.target.value})}
+                              className="w-12 h-10 border border-pink-500/30 rounded-lg cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={certificateCustomization.textColor}
+                              onChange={(e) => setCertificateCustomization({...certificateCustomization, textColor: e.target.value})}
+                              className="flex-1 px-2 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm text-purple-200 mb-1.5">Background</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={certificateCustomization.backgroundColor}
+                              onChange={(e) => setCertificateCustomization({...certificateCustomization, backgroundColor: e.target.value})}
+                              className="w-12 h-10 border border-pink-500/30 rounded-lg cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={certificateCustomization.backgroundColor}
+                              onChange={(e) => setCertificateCustomization({...certificateCustomization, backgroundColor: e.target.value})}
+                              className="flex-1 px-2 py-2 bg-white/20 border border-pink-500/30 rounded-lg text-white text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        onClick={() => {
+                          setShowCertificateEditor(false);
+                          setEditingCertificate(null);
+                        }}
+                        className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all border border-pink-500/30 font-medium"
+                        disabled={isSaving}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveCertificateCustomization}
+                        className="flex-1 px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg transition-all disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Customization
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  <div className="sticky top-4">
+                    <h4 className="text-white font-semibold mb-3">Live Preview</h4>
+                    <div className="bg-white rounded-lg p-4 shadow-2xl">
+                      <div 
+                        className="w-full relative overflow-hidden rounded-lg"
+                        style={{ 
+                          backgroundColor: certificateCustomization.backgroundColor,
+                          aspectRatio: '1.414 / 1',
+                          minHeight: '400px',
+                          padding: '40px'
+                        }}
+                      >
+                        <div className="h-full flex flex-col justify-center text-center">
+                          <h1 
+                            className="font-bold mb-2"
+                            style={{
+                              fontSize: `${certificateCustomization.titleFontSize * 0.4}px`,
+                              color: certificateCustomization.primaryColor,
+                              fontFamily: 'Georgia, serif'
+                            }}
+                          >
+                            {certificateCustomization.title}
+                          </h1>
+                          <p 
+                            className="italic mb-6"
+                            style={{
+                              fontSize: '16px',
+                              color: certificateCustomization.textColor,
+                              fontFamily: 'Georgia, serif'
+                            }}
+                          >
+                            {certificateCustomization.subtitle}
+                          </p>
+                          <p 
+                            className="mb-4"
+                            style={{
+                              fontSize: `${certificateCustomization.contentFontSize}px`,
+                              color: certificateCustomization.textColor
+                            }}
+                          >
+                            {certificateCustomization.presentedText}
+                          </p>
+                          <div 
+                            className="mb-4"
+                            style={{
+                              fontSize: `${certificateCustomization.nameFontSize * 0.4}px`,
+                              color: certificateCustomization.primaryColor,
+                              fontFamily: 'Georgia, serif',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {user?.full_name || user?.username}
+                          </div>
+                          <p 
+                            className="mb-6"
+                            style={{
+                              fontSize: `${certificateCustomization.contentFontSize}px`,
+                              color: certificateCustomization.textColor
+                            }}
+                          >
+                            {certificateCustomization.content || 'atas partisipasinya dalam event...'}
+                          </p>
+                          <div 
+                            className="text-xs mt-auto"
+                            style={{ color: certificateCustomization.textColor }}
+                          >
+                            {certificateCustomization.footer}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Certificate Preview Modal */}
         {showCertificatePreview && selectedCertificate && (
@@ -981,7 +1511,7 @@ const SettingsPage = () => {
                       </div>
                       <div className="text-right">
                         <div className="w-32 h-0.5 bg-gray-800 mb-2"></div>
-                        <p className="text-sm text-gray-600">EventHub</p>
+                        <p className="text-sm text-gray-600">Event Yukk</p>
                       </div>
                     </div>
                   </div>

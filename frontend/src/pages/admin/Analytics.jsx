@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Users, ClipboardList, FolderKanban, Activity } from 'lucide-react';
+import { TrendingUp, Users, ClipboardList, FolderKanban, Activity, Calendar, Target, Rocket, BarChart3, Zap, Trophy } from 'lucide-react';
 import { eventsAPI, usersAPI, registrationsAPI, categoriesAPI } from '../../services/api';
 
 const Analytics = () => {
@@ -68,18 +68,19 @@ const Analytics = () => {
   };
 
   const StatCard = ({ title, value, icon, color, change }) => (
-    <div className="bg-white p-6 rounded-2xl border border-gray-200 hover:border-gray-300 transition-colors shadow-sm">
+    <div className="bg-white p-5 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors shadow-sm">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-600 text-sm font-medium">{title}</p>
-          <p className={`text-3xl font-bold ${color.replace('text-', 'text-').replace('-400', '-600')}`}>{value}</p>
+        <div className="flex-1">
+          <p className="text-gray-600 text-sm font-medium mb-1">{title}</p>
+          <p className={`text-2xl font-bold ${color}`}>{value}</p>
           {change && (
-            <p className="text-green-600 text-sm mt-1">
-              ↗️ +{change}% this month
+            <p className="text-green-600 text-xs mt-1.5 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" />
+              +{change}% this month
             </p>
           )}
         </div>
-        <div className="text-4xl">
+        <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center">
           {icon}
         </div>
       </div>
@@ -102,7 +103,10 @@ const Analytics = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-black mb-2">📈 Analytics & Reports</h1>
+          <h1 className="text-3xl font-bold text-black mb-2 flex items-center gap-2">
+            <TrendingUp className="w-8 h-8 text-blue-600" />
+            Analytics & Reports
+          </h1>
           <p className="text-gray-600">Insights into your event data</p>
         </div>
         <div className="mt-4 md:mt-0">
@@ -120,42 +124,45 @@ const Analytics = () => {
       </div>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Events"
           value={analytics.totalEvents}
-          icon="🎪"
-          color="text-blue-400"
+          icon={<Calendar className="w-6 h-6 text-blue-600" />}
+          color="text-blue-600"
           change={12}
         />
         <StatCard
           title="Active Users"
           value={analytics.totalUsers}
-          icon={<Users className="w-8 h-8 text-green-400" />}
-          color="text-green-400"
+          icon={<Users className="w-6 h-6 text-green-600" />}
+          color="text-green-600"
           change={8}
         />
         <StatCard
           title="Registrations"
           value={analytics.totalRegistrations}
-          icon={<ClipboardList className="w-8 h-8 text-purple-400" />}
-          color="text-purple-400"
+          icon={<ClipboardList className="w-6 h-6 text-purple-600" />}
+          color="text-purple-600"
           change={25}
         />
         <StatCard
           title="Categories"
           value={analytics.totalCategories}
-          icon={<FolderKanban className="w-8 h-8 text-pink-400" />}
-          color="text-pink-400"
+          icon={<FolderKanban className="w-6 h-6 text-pink-600" />}
+          color="text-pink-600"
           change={5}
         />
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Events by Category */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-black mb-6">🎯 Events by Category</h3>
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+          <h3 className="text-lg font-bold text-black mb-5 flex items-center gap-2">
+            <Target className="w-5 h-5 text-pink-600" />
+            Events by Category
+          </h3>
           <div className="space-y-4">
             {analytics.eventsByCategory.map((category, index) => (
               <div key={category.name}>
@@ -178,8 +185,11 @@ const Analytics = () => {
         </div>
 
         {/* Top Events */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <h3 className="text-xl font-bold text-black mb-6">🏆 Top Events</h3>
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+          <h3 className="text-lg font-bold text-black mb-5 flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-amber-600" />
+            Top Events
+          </h3>
           <div className="space-y-4">
             {analytics.topEvents.map((event, index) => (
               <div key={event.id} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
@@ -200,8 +210,11 @@ const Analytics = () => {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-        <h3 className="text-xl font-bold text-black mb-6">⚡ Recent Activity</h3>
+      <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-bold text-black mb-5 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-orange-600" />
+          Recent Activity
+        </h3>
         <div className="space-y-4">
           {analytics.recentActivity.map((activity, index) => (
             <div key={activity.id} className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
@@ -236,36 +249,42 @@ const Analytics = () => {
       </div>
 
       {/* Performance Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <div className="flex items-center mb-4">
-            <div className="text-3xl mr-3">📊</div>
-            <h3 className="text-lg font-bold text-black">Conversion Rate</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-green-600" />
+            </div>
+            <h3 className="text-base font-bold text-black">Conversion Rate</h3>
           </div>
-          <div className="text-3xl font-bold text-green-600 mb-2">
+          <div className="text-2xl font-bold text-green-600 mb-1">
             {analytics.totalEvents > 0 ? Math.round((analytics.totalRegistrations / analytics.totalEvents) * 100) / 100 : 0}%
           </div>
-          <p className="text-gray-600 text-sm">Average registrations per event</p>
+          <p className="text-gray-600 text-xs">Average registrations per event</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <div className="flex items-center mb-4">
-            <div className="text-3xl mr-3">🎯</div>
-            <h3 className="text-lg font-bold text-black">Engagement</h3>
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Target className="w-5 h-5 text-blue-600" />
+            </div>
+            <h3 className="text-base font-bold text-black">Engagement</h3>
           </div>
-          <div className="text-3xl font-bold text-blue-600 mb-2">
+          <div className="text-2xl font-bold text-blue-600 mb-1">
             {analytics.totalUsers > 0 ? Math.round((analytics.totalRegistrations / analytics.totalUsers) * 100) / 100 : 0}
           </div>
-          <p className="text-gray-600 text-sm">Registrations per user</p>
+          <p className="text-gray-600 text-xs">Registrations per user</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <div className="flex items-center mb-4">
-            <div className="text-3xl mr-3">🚀</div>
-            <h3 className="text-lg font-bold text-black">Growth</h3>
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Rocket className="w-5 h-5 text-purple-600" />
+            </div>
+            <h3 className="text-base font-bold text-black">Growth</h3>
           </div>
-          <div className="text-3xl font-bold text-purple-600 mb-2">+24%</div>
-          <p className="text-gray-600 text-sm">Month over month growth</p>
+          <div className="text-2xl font-bold text-purple-600 mb-1">+24%</div>
+          <p className="text-gray-600 text-xs">Month over month growth</p>
         </div>
       </div>
     </div>

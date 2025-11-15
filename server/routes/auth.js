@@ -66,7 +66,7 @@ const sanitizeUser = (user) => {
 // Register user
 router.post('/register', validateUserRegistration, handleValidationErrors, async (req, res) => {
   try {
-    const { username, email, password, full_name, phone } = req.body;
+    const { username, email, password, full_name, phone, address, education } = req.body;
 
     // Normalize email (remove dots from Gmail addresses and convert to lowercase)
     const normalizedEmail = email.toLowerCase().trim();
@@ -78,6 +78,18 @@ router.post('/register', validateUserRegistration, handleValidationErrors, async
     const finalEmail = emailParts.join('@');
 
     console.log(`📧 Email normalization: ${email} → ${finalEmail}`);
+
+    // Validate password complexity
+    // Must contain: min 8 chars, uppercase, lowercase, number, special character
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    
+    if (!passwordRegex.test(password)) {
+      return ApiResponse.badRequest(
+        res,
+        'Password harus minimal 8 karakter dan mengandung: huruf besar, huruf kecil, angka, dan karakter spesial (@$!%*?&#). ' +
+        'Contoh: Password123#'
+      );
+    }
 
     // Check if user already exists
     const [existingUsers] = await query(
@@ -95,8 +107,8 @@ router.post('/register', validateUserRegistration, handleValidationErrors, async
 
     // Create user (INACTIVE until email verification)
     const [result] = await query(
-      'INSERT INTO users (username, email, password, full_name, phone, role, is_active) VALUES (?, ?, ?, ?, ?, ?, FALSE)',
-      [username, finalEmail, hashedPassword, full_name, phone, 'user']
+      'INSERT INTO users (username, email, password, full_name, phone, address, education, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, FALSE)',
+      [username, finalEmail, hashedPassword, full_name, phone, address || null, education || null, 'user']
     );
 
     const userId = result.insertId;

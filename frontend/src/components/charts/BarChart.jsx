@@ -1,12 +1,12 @@
 import React from 'react';
 
-const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', height = 300 }) => {
+const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#2563eb', height = 300 }) => {
   if (!data || data.length === 0) {
     return (
-      <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-        <h3 className="text-xl font-bold text-white mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-slate-400">No data available</p>
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+        {title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{title}</h3>}
+        <div className="flex items-center justify-center h-48 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+          <p className="text-gray-500 text-sm">Belum ada data untuk periode ini</p>
         </div>
       </div>
     );
@@ -19,10 +19,12 @@ const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', heig
   const barSpacing = (chartWidth - 100) / data.length;
 
   return (
-    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 hover:border-blue-500/50 transition-colors">
-      <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-        📊 {title}
-      </h3>
+    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+      {title && (
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          {title}
+        </h3>
+      )}
       
       <div className="overflow-x-auto">
         <svg width={chartWidth} height={height} className="mx-auto">
@@ -32,7 +34,7 @@ const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', heig
             y1="20" 
             x2="50" 
             y2={chartHeight + 20} 
-            stroke="#475569" 
+            stroke="#e2e8f0" 
             strokeWidth="2"
           />
           
@@ -42,7 +44,7 @@ const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', heig
             y1={chartHeight + 20} 
             x2={chartWidth - 50} 
             y2={chartHeight + 20} 
-            stroke="#475569" 
+            stroke="#e2e8f0" 
             strokeWidth="2"
           />
 
@@ -57,7 +59,7 @@ const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', heig
                   y1={y} 
                   x2="50" 
                   y2={y} 
-                  stroke="#475569" 
+                  stroke="#e2e8f0" 
                   strokeWidth="1"
                 />
                 <text 
@@ -99,10 +101,10 @@ const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', heig
                   <text
                     x={x + barWidth / 2}
                     y={y - 5}
-                    fill="#e2e8f0"
+                    fill="#475569"
                     fontSize="12"
                     textAnchor="middle"
-                    fontWeight="bold"
+                    fontWeight="600"
                   >
                     {item.value}
                   </text>
@@ -112,8 +114,8 @@ const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', heig
                 <text
                   x={x + barWidth / 2}
                   y={chartHeight + 40}
-                  fill="#94a3b8"
-                  fontSize="11"
+                  fill="#475569"
+                  fontSize="12"
                   textAnchor="middle"
                   transform={data.length > 8 ? `rotate(-45, ${x + barWidth / 2}, ${chartHeight + 40})` : ''}
                 >
@@ -130,7 +132,7 @@ const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', heig
             fill="#94a3b8"
             fontSize="14"
             textAnchor="middle"
-            fontWeight="bold"
+            fontWeight="600"
           >
             {xAxisLabel}
           </text>
@@ -143,7 +145,7 @@ const BarChart = ({ data, title, xAxisLabel, yAxisLabel, color = '#06b6d4', heig
             fontSize="14"
             textAnchor="middle"
             transform={`rotate(-90, 20, ${chartHeight / 2})`}
-            fontWeight="bold"
+            fontWeight="600"
           >
             {yAxisLabel}
           </text>

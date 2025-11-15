@@ -242,6 +242,29 @@ const EditEvent = () => {
       console.log('=== FRONTEND: Starting update ===');
       console.log('Form data:', formData);
 
+      // Validate H-3 rule: Event must be at least 3 days in the future
+      const minAdvanceDays = 3;
+      const now = new Date();
+      const minDate = new Date(now.getTime() + (minAdvanceDays * 24 * 60 * 60 * 1000));
+      minDate.setHours(0, 0, 0, 0);
+      
+      const eventDate = new Date(formData.event_date);
+      eventDate.setHours(0, 0, 0, 0);
+      
+      if (eventDate < minDate) {
+        const minDateFormatted = minDate.toLocaleDateString('id-ID', { 
+          day: 'numeric', 
+          month: 'long', 
+          year: 'numeric' 
+        });
+        toast.error(
+          `Event hanya dapat dibuat minimal ${minAdvanceDays} hari sebelum tanggal event (H-${minAdvanceDays}). ` +
+          `Tanggal event paling awal yang bisa dibuat: ${minDateFormatted}`
+        );
+        setSaving(false);
+        return;
+      }
+
       const submitData = new FormData();
       
       // Split datetime-local into date and time
@@ -342,9 +365,9 @@ const EditEvent = () => {
       console.log('=== UPDATE COMPLETE ===');
       toast.success('✅ Event berhasil diupdate!');
       
-      // Navigate after small delay to show toast
+      // Navigate with refresh state after small delay to show toast
       setTimeout(() => {
-        navigate('/admin/events');
+        navigate('/admin/events', { state: { refresh: true }, replace: true });
       }, 500);
       
     } catch (error) {

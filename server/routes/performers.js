@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
+const { promisePool, query } = require('../db');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -37,7 +37,7 @@ const upload = multer({
 // Get all performers for an event
 router.get('/event/:eventId', async (req, res) => {
   try {
-    const [performers] = await db.execute(
+    const [performers] = await query(
       'SELECT * FROM performers WHERE event_id = ? ORDER BY display_order ASC',
       [req.params.eventId]
     );
@@ -54,7 +54,7 @@ router.post('/', upload.single('photo'), async (req, res) => {
     const { event_id, name, display_order } = req.body;
     const photo_url = req.file ? `/uploads/performers/${req.file.filename}` : null;
 
-    const [result] = await db.execute(
+    const [result] = await query(
       'INSERT INTO performers (event_id, name, photo_url, display_order) VALUES (?, ?, ?, ?)',
       [event_id, name, photo_url, display_order || 0]
     );
@@ -94,7 +94,7 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
       }
     }
 
-    await db.execute(
+    await query(
       'UPDATE performers SET name = ?, display_order = ?, photo_url = COALESCE(?, photo_url) WHERE id = ?',
       [name, display_order, updateFields.photo_url, req.params.id]
     );
@@ -110,7 +110,7 @@ router.put('/:id', upload.single('photo'), async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     // Get performer photo to delete file
-    const [performer] = await db.execute('SELECT photo_url FROM performers WHERE id = ?', [req.params.id]);
+    const [performer] = await query('SELECT photo_url FROM performers WHERE id = ?', [req.params.id]);
     
     if (performer[0]?.photo_url) {
       const photoPath = path.join(__dirname, '..', performer[0].photo_url);
@@ -119,7 +119,7 @@ router.delete('/:id', async (req, res) => {
       }
     }
 
-    await db.execute('DELETE FROM performers WHERE id = ?', [req.params.id]);
+    await query('DELETE FROM performers WHERE id = ?', [req.params.id]);
     res.json({ success: true, message: 'Performer deleted successfully' });
   } catch (error) {
     console.error('Error deleting performer:', error);
@@ -129,7 +129,7 @@ router.delete('/:id', async (req, res) => {
 
 // Bulk create performers for an event
 router.post('/bulk', async (req, res) => {
-  const connection = await db.getConnection();
+  const connection = await promisePool.getConnection();
   try {
     await connection.beginTransaction();
     

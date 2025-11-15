@@ -33,7 +33,7 @@ router.post('/create', authenticateToken, requireUser, async (req, res) => {
 
     // Check if user already registered
     const [existingRegistrations] = await query(
-      'SELECT * FROM event_registrations WHERE event_id = ? AND user_id = ?',
+      'SELECT * FROM registrations WHERE event_id = ? AND user_id = ?',
       [event_id, user_id]
     );
 
@@ -43,7 +43,7 @@ router.post('/create', authenticateToken, requireUser, async (req, res) => {
 
     // Check if event is full
     const [registrationCount] = await query(
-      'SELECT COUNT(*) as count FROM event_registrations WHERE event_id = ? AND status = "approved"',
+      'SELECT COUNT(*) as count FROM registrations WHERE event_id = ? AND status = "confirmed"',
       [event_id]
     );
 
@@ -54,16 +54,16 @@ router.post('/create', authenticateToken, requireUser, async (req, res) => {
     // Generate order ID
     const orderId = `EVENT-${event_id}-${user_id}-${Date.now()}`;
 
-    // Create registration record with approved status (simulate instant payment)
+    // Create registration record with confirmed status (simulate instant payment)
     const [registrationResult] = await query(
-      'INSERT INTO event_registrations (event_id, user_id, registration_fee, status, order_id) VALUES (?, ?, ?, ?, ?)',
-      [event_id, user_id, event.registration_fee, 'approved', orderId]
+      'INSERT INTO registrations (event_id, user_id, payment_method, status, payment_amount) VALUES (?, ?, ?, ?, ?)',
+      [event_id, user_id, 'midtrans', 'confirmed', event.price]
     );
 
     // Store payment details as successful
     await query(
       'INSERT INTO payments (registration_id, order_id, amount, payment_method, status, payment_date) VALUES (?, ?, ?, ?, ?, NOW())',
-      [registrationResult.insertId, orderId, event.registration_fee, 'database', 'success']
+      [registrationResult.insertId, orderId, event.price, 'database', 'success']
     );
 
     return ApiResponse.success(res, {
@@ -117,12 +117,12 @@ router.post('/notification', async (req, res) => {
     // Update registration status if payment successful
     if (paymentStatus === 'success') {
       await query(
-        'UPDATE event_registrations SET status = "approved", updated_at = CURRENT_TIMESTAMP WHERE order_id = ?',
+        'UPDATE registrations SET status = "confirmed", updated_at = CURRENT_TIMESTAMP WHERE payment_method = ? LIMIT 1',
         [orderId]
       );
     } else if (paymentStatus === 'failed') {
       await query(
-        'UPDATE event_registrations SET status = "rejected", updated_at = CURRENT_TIMESTAMP WHERE order_id = ?',
+        'UPDATE registrations SET status = "cancelled", updated_at = CURRENT_TIMESTAMP WHERE payment_method = ? LIMIT 1',
         [orderId]
       );
     }
@@ -141,11 +141,11 @@ router.get('/status/:orderId', authenticateToken, requireUser, async (req, res) 
     const { orderId } = req.params;
 
     const [payments] = await query(
-      `SELECT p.*, er.event_id, e.title as event_title 
+      `SELECT p.*, r.event_id, e.title as event_title 
        FROM payments p
-       JOIN event_registrations er ON p.registration_id = er.id
-       JOIN events e ON er.event_id = e.id
-       WHERE p.order_id = ? AND er.user_id = ?`,
+       JOIN registrations r ON p.registration_id = r.id
+       JOIN events e ON r.event_id = e.id
+       WHERE p.order_id = ? AND r.user_id = ?`,
       [orderId, req.user.id]
     );
 
@@ -165,11 +165,11 @@ router.get('/status/:orderId', authenticateToken, requireUser, async (req, res) 
 router.get('/history', authenticateToken, requireUser, async (req, res) => {
   try {
     const [payments] = await query(
-      `SELECT p.*, er.event_id, e.title as event_title, e.event_date
+      `SELECT p.*, r.event_id, e.title as event_title, e.event_date
        FROM payments p
-       JOIN event_registrations er ON p.registration_id = er.id
-       JOIN events e ON er.event_id = e.id
-       WHERE er.user_id = ?
+       JOIN registrations r ON p.registration_id = r.id
+       JOIN events e ON r.event_id = e.id
+       WHERE r.user_id = ?
        ORDER BY p.created_at DESC`,
       [req.user.id]
     );

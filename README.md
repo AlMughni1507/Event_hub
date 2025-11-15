@@ -1,90 +1,144 @@
-# Event Management System
+# Event Yukk Platform
 
-Sistem manajemen event dengan fitur autentikasi, OTP email, dan dashboard admin terpisah.
+Aplikasi manajemen event modern berbasis web yang dibangun dengan React, Node.js, dan MySQL. Platform ini menyediakan fitur lengkap untuk pengelolaan event, pendaftaran peserta, pembayaran, sertifikat, dan analitik.
 
-## Fitur Utama
+## 🌟 Fitur Utama
 
-### 🔐 Autentikasi & Keamanan
-- **Login Multi-Role**: Admin dan User/Visitor
-- **Registrasi dengan OTP**: Verifikasi email wajib untuk visitor
-- **JWT Authentication**: Token-based security
-- **Role-based Access**: Pembatasan akses berdasarkan role
+- 🔐 Autentikasi & Keamanan
+  - Login Multi-Role (Admin/User)
+  - Registrasi dengan OTP Email
+  - JWT Authentication
+  - Role-based Access Control
 
-### 👥 User Management
-- **Admin**: `admin@gmail.com` / `admin123` (username dan email sama)
-- **Visitor**: Wajib register dengan OTP email
-- **User Activation**: Akun visitor harus diverifikasi via OTP
+- 👥 User Management
+  - Authentikasi (Login/Register)
+  - Role-based access (Admin/User)
+  - Profil pengguna
+  - Email OTP verification
+  
+- � Manajemen Event
+  - Pembuatan dan pengelolaan event
+  - Kategori event
+  - Event highlight
+  - Sertifikat peserta
+  
+- 💳 Pembayaran & Registrasi
+  - Integrasi Midtrans Payment Gateway
+  - Manajemen pendaftaran
+  - Riwayat pembayaran
+  
+- 📊 Analytics & Reporting
+  - Dashboard admin
+  - Statistik event
+  - Export data (XLSX, DOCX)
+  
+- � Fitur Tambahan
+  - Blog/Artikel
+  - Kontak form
+  - Reviews & Rating
+  - PWA support
+  - Email notifications
 
-### 🎯 Admin Dashboard (AdminLTE)
-- **Dashboard Stats**: Total users, events, categories, registrations
-- **User Management**: CRUD users, aktivasi/deaktivasi
-- **Event Management**: CRUD events dan categories
-- **Registration Management**: Lihat semua registrasi
-- **Reports**: Laporan events dan users
+## 🛠️ Tech Stack
 
-### 🌐 Frontend
-- **Tampilan Utama**: Design modern untuk visitor
-- **Admin Panel**: AdminLTE design terpisah
-- **Responsive**: Mobile-friendly
+### Frontend
+- React + Vite
+- TailwindCSS
+- React Router DOM
+- Axios
+- Chart.js
+- Framer Motion
 
-## Struktur Folder
+### Backend
+- Node.js + Express
+- MySQL/MariaDB
+- JWT Authentication
+- Nodemailer
+- Multer (file uploads)
+- Express Validator
+- Helmet & CORS
+
+## 📁 Struktur Folder
 
 ```
 ujikom-web-event/
 ├── frontend/                 # React Frontend
 │   ├── src/
-│   │   ├── components/
-│   │   │   └── admin/       # AdminLTE Components
-│   │   ├── pages/
-│   │   │   ├── main/        # Tampilan Utama
-│   │   │   ├── events/      # Halaman Events
-│   │   │   ├── auth/        # Login & Register
-│   │   │   └── admin/       # Admin Dashboard
-│   │   └── styles/
-│   │       └── admin.css    # AdminLTE Styles
+│   │   ├── components/      # Reusable components
+│   │   ├── contexts/        # React contexts
+│   │   ├── lib/            # Utilities
+│   │   ├── pages/          # Page components
+│   │   │   ├── admin/      # Admin dashboard
+│   │   │   ├── auth/       # Login/Register
+│   │   │   ├── events/     # Event pages
+│   │   │   └── main/       # Public pages
+│   │   ├── services/       # API services
+│   │   └── styles/         # CSS/styling
+│   └── public/             # Static assets
 ├── server/                  # Node.js Backend
-│   ├── routes/
-│   │   ├── auth.js         # Authentication
-│   │   ├── events.js       # Events API
-│   │   └── admin.js        # Admin API
-│   ├── middleware/         # Auth & Validation
-│   ├── utils/              # Email & Utilities
-│   └── migrations/         # Database Migrations
+│   ├── middleware/         # Express middleware
+│   ├── migrations/         # Database migrations
+│   ├── routes/            # API routes
+│   ├── services/          # Business logic
+│   ├── uploads/           # Uploaded files
+│   └── utils/             # Utilities
 ```
 
-## Setup & Instalasi
+## 📦 Prasyarat
 
-### 1. Database Setup
-```sql
--- Jalankan semua file di folder server/migrations/
--- Urutan: 001, 002, 003, dst.
+- Node.js v18+
+- MySQL/MariaDB
+- SMTP Server (untuk email)
+- Midtrans Account (opsional)
+
+## 🚀 Setup & Instalasi
+
+### 1. Clone Repository
+```bash
+git clone https://github.com/AlMughni1507/ujikom-web-event.git
+cd ujikom-web-event
 ```
 
-### 2. Environment Variables
-Buat file `server/config.env`:
+### 2. Database Setup
+1. Buat database MySQL baru
+2. Import semua file migrasi di folder `server/migrations/` secara berurutan
+
+### 3. Konfigurasi Environment
+
+#### Backend (`server/config.env`)
 ```env
 # Database
 DB_HOST=127.0.0.1
 DB_USER=root
 DB_PASSWORD=your_password
 DB_NAME=event_db
+DB_PORT=3306
+
+# Server
+PORT=3000
+NODE_ENV=development
 
 # JWT
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=24h
 
-# Email (untuk OTP)
+# Email (SMTP)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_app_password
-SMTP_FROM_EMAIL=no-reply@example.com
+SMTP_FROM_NAME=Event Yukk
 
-# Admin Seed
-ADMIN_SEED_KEY=change-this-seed-key
+# Midtrans (opsional)
+MIDTRANS_SERVER_KEY=your-server-key
+MIDTRANS_CLIENT_KEY=your-client-key
+
+# Frontend URL
+FRONTEND_URL=http://localhost:5173
 ```
 
-### 3. Install Dependencies
+### 4. Install Dependencies
+
 ```bash
 # Backend
 cd server
@@ -95,22 +149,19 @@ cd frontend
 npm install
 ```
 
-### 4. Seed Admin
+### 5. Seed Admin User
 ```bash
-# Di folder server
-Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:3000/api/auth/seed-admin" `
-  -ContentType "application/json" `
-  -Body (@{
-    key = "change-this-seed-key"
-    username = "admin@gmail.com"
-    email = "admin@gmail.com"
-    password = "admin123"
-    full_name = "System Administrator"
-  } | ConvertTo-Json)
+curl -X POST http://localhost:3000/api/auth/seed-admin -H "Content-Type: application/json" -d '{
+  "key": "change-this-seed-key",
+  "username": "admin@gmail.com",
+  "email": "admin@gmail.com",
+  "password": "admin123",
+  "full_name": "System Administrator"
+}'
 ```
 
-### 5. Run Application
+### 6. Jalankan Aplikasi
+
 ```bash
 # Terminal 1 - Backend
 cd server
@@ -121,32 +172,43 @@ cd frontend
 npm run dev
 ```
 
-## API Endpoints
+Frontend akan berjalan di http://localhost:5173
+Backend akan berjalan di http://localhost:3000
 
-### Authentication
-- `POST /api/auth/register` - Register visitor
-- `POST /api/auth/request-email-otp` - Request OTP
-- `POST /api/auth/verify-email` - Verify OTP
-- `POST /api/auth/login/user` - Login visitor
-- `POST /api/auth/login/admin` - Login admin
-- `POST /api/auth/seed-admin` - Create admin (one-time)
+## 📝 API Documentation
 
-### Admin (Protected)
-- `GET /api/admin/dashboard-stats` - Dashboard statistics
-- `GET /api/admin/users` - Get all users
-- `GET /api/admin/events` - Get all events
-- `GET /api/admin/categories` - Get all categories
-- `GET /api/admin/registrations` - Get all registrations
-- `POST /api/admin/categories` - Create category
-- `PUT /api/admin/categories/:id` - Update category
-- `DELETE /api/admin/categories/:id` - Delete category
-- `PUT /api/admin/users/:id/status` - Update user status
-- `DELETE /api/admin/users/:id` - Delete user
+Base URL: `http://localhost:3000/api`
 
-### Events (Public)
-- `GET /api/events` - Get all events
-- `GET /api/events/:id` - Get event detail
-- `GET /api/events/featured` - Get featured events
+### Endpoints
+
+- 🔐 Auth: `/auth/*`
+- 📅 Events: `/events/*`
+- 👥 Users: `/users/*`
+- 📦 Categories: `/categories/*`
+- 💳 Payments: `/payments/*`
+- 📊 Analytics: `/analytics/*`
+- 📝 Articles: `/articles/*`
+- 📞 Contact: `/contact/*`
+
+Detail dokumentasi API dapat dilihat di kode route masing-masing endpoint.
+
+## 🤝 Contributing
+
+1. Fork repository
+2. Buat branch fitur baru (`git checkout -b feature/AmazingFeature`)
+3. Commit perubahan (`git commit -m 'Add some AmazingFeature'`)
+4. Push ke branch (`git push origin feature/AmazingFeature`)
+5. Buka Pull Request
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+## 📧 Contact
+
+Al Mughni - abdul.mughni845@gmail.com
+
+Project Link: https://github.com/AlMughni1507/ujikom-web-event
 
 ## User Flow
 

@@ -1,6 +1,6 @@
 {
-  "name": "EventHub - Event Management System",
-  "short_name": "EventHub",
+  "name": "Event Yukk - Event Management System",
+  "short_name": "Event Yukk",
   "description": "Platform terbaik untuk menemukan dan mendaftar event berkualitas",
   "start_url": "/",
   "display": "standalone",

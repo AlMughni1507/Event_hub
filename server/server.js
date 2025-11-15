@@ -63,6 +63,7 @@ const registrationRoutes = require('./routes/registrations');
 const userRoutes = require('./routes/users');
 const analyticsRoutes = require('./routes/analytics');
 const articlesRoutes = require('./routes/articles');
+const blogsRoutes = require('./routes/blogs');
 const contactsRoutes = require('./routes/contacts');
 const contactRoutes = require('./routes/contact');
 const historyRoutes = require('./routes/history');
@@ -72,6 +73,7 @@ const attendanceRoutes = require('./routes/attendance');
 const certificateRoutes = require('./routes/certificates');
 const performersRoutes = require('./routes/performers');
 const reviewsRoutes = require('./routes/reviews');
+const reportsRoutes = require('./routes/reports');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -82,6 +84,7 @@ app.use('/api/registrations', registrationRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/articles', articlesRoutes);
+app.use('/api/blogs', blogsRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/history', historyRoutes);
@@ -91,6 +94,9 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/performers', performersRoutes);
 app.use('/api/reviews', reviewsRoutes);
+app.use('/api/admin/reports', reportsRoutes);
+
+console.log('✅ Reports routes registered at /api/admin/reports');
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eventhub-v1';
+const CACHE_NAME = 'eventyukk-v1';
 const urlsToCache = [
   '/',
   '/static/js/bundle.js',

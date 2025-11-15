@@ -1,11 +1,24 @@
 const cron = require('node-cron');
-const { archiveEndedEvents } = require('./eventCleanup');
+const { archiveEndedEvents, markAbsentRegistrations } = require('./eventCleanup');
 
 /**
  * Initialize all cron jobs
  */
 const initCronJobs = () => {
   console.log('⏰ Initializing cron jobs...');
+
+  // Run every hour to check for absent registrations
+  cron.schedule('0 * * * *', async () => {
+    console.log('⏰ Running hourly attendance check...');
+    try {
+      const result = await markAbsentRegistrations();
+      if (result.marked > 0) {
+        console.log(`✅ Marked ${result.marked} registrations as absent`);
+      }
+    } catch (error) {
+      console.error('❌ Hourly attendance check failed:', error);
+    }
+  });
 
   // Run every day at 2 AM to archive ended events
   cron.schedule('0 2 * * *', async () => {
@@ -32,6 +45,7 @@ const initCronJobs = () => {
   });
 
   console.log('✅ Cron jobs initialized:');
+  console.log('   - Hourly attendance check (mark absent registrations)');
   console.log('   - Daily archival at 2:00 AM');
   console.log('   - 6-hour archival checks');
 };

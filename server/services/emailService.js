@@ -36,6 +36,43 @@ class EmailService {
     }
   }
 
+  async sendEmail({ to, subject, html, text }) {
+    try {
+      if (!to) {
+        throw new Error('Recipient email is required');
+      }
+
+      if (!this.isConfigured || !this.transporter) {
+        console.warn('📨 SMTP not configured. Using fallback logging for email notification.');
+        console.log('----- EMAIL (FALLBACK) -----');
+        console.log('To      :', to);
+        console.log('Subject :', subject);
+        if (text) {
+          console.log('Text    :', text);
+        }
+        if (html) {
+          console.log('HTML    :', html.substring(0, 500) + (html.length > 500 ? '...' : ''));
+        }
+        console.log('----------------------------');
+        return { success: true, fallback: true };
+      }
+
+      const info = await this.transporter.sendMail({
+        from: `"Event Yukk" <${process.env.SMTP_USER}>`,
+        to,
+        subject,
+        text,
+        html,
+      });
+
+      console.log(`📧 Email sent to ${to} (${info.messageId})`);
+      return { success: true, messageId: info.messageId };
+    } catch (error) {
+      console.error('❌ sendEmail error:', error);
+      throw error;
+    }
+  }
+
   // Generate 6-digit OTP
   generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -101,16 +138,16 @@ class EmailService {
       }
 
       const mailOptions = {
-        from: `"EventHub" <${process.env.SMTP_USER}>`,
+        from: `"Event Yukk" <${process.env.SMTP_USER}>`,
         to: email,
-        subject: 'Password Reset - EventHub',
+        subject: 'Password Reset - Event Yukk',
         html: `
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Password Reset - EventHub</title>
+            <title>Password Reset - Event Yukk</title>
             <style>
               body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
               .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
@@ -128,12 +165,12 @@ class EmailService {
             <div class="container">
               <div class="header">
                 <h1>🔐 Password Reset</h1>
-                <p>EventHub Security</p>
+                <p>Event Yukk Security</p>
               </div>
               
               <div class="content">
                 <h2>Hello ${fullName}!</h2>
-                <p>We received a request to reset your password for your EventHub account.</p>
+                <p>We received a request to reset your password for your Event Yukk account.</p>
                 
                 <div class="reset-box">
                   <p>Your password reset code is:</p>
@@ -148,14 +185,14 @@ class EmailService {
                   • If you didn't request this reset, please ignore this email<br>
                   • Never share this code with anyone<br>
                   • This code expires in 15 minutes<br>
-                  • Only use this code on the official EventHub website
+                  • Only use this code on the official Event Yukk website
                 </div>
               </div>
               
               <div class="footer">
-                <p>This is an automated message from EventHub.<br>
+                <p>This is an automated message from Event Yukk.<br>
                 Please do not reply to this email.</p>
-                <p>&copy; 2024 EventHub. All rights reserved.</p>
+                <p>&copy; 2024 Event Yukk. All rights reserved.</p>
               </div>
             </div>
           </body>
@@ -186,7 +223,7 @@ class EmailService {
         };
       }
       const mailOptions = {
-        from: `"EventHub Platform" <${process.env.SMTP_USER}>`,
+        from: `"Event Yukk Platform" <${process.env.SMTP_USER}>`,
         to: email, // Dynamic - setiap user beda email
         subject: 'Email Verification OTP',
         text: `Your email verification OTP is: ${otpCode}. Valid for 15 minutes.`,
@@ -196,7 +233,7 @@ class EmailService {
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Email Verification OTP - EventHub</title>
+            <title>Email Verification OTP - Event Yukk</title>
             <style>
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
@@ -295,7 +332,7 @@ class EmailService {
               </div>
               
               <div class="footer">
-                <div class="company">EventHub Platform</div>
+                <div class="company">Event Yukk Platform</div>
                 <div>This is an automated message. Please do not reply.</div>
               </div>
             </div>
@@ -310,6 +347,153 @@ class EmailService {
     } catch (error) {
       console.error('❌ Error sending OTP email:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  // Send password change OTP email
+  async sendPasswordChangeOTP(email, fullName, otpCode) {
+    try {
+      const subject = 'Kode OTP untuk Ganti Password - Event Yukk';
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Password Change OTP - Event Yukk</title>
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+              margin: 0; 
+              padding: 20px; 
+              background-color: #f5f5f5; 
+              line-height: 1.6;
+            }
+            .container { 
+              max-width: 500px; 
+              margin: 0 auto; 
+              background: white; 
+              border-radius: 8px; 
+              overflow: hidden; 
+              box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            }
+            .header { 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              padding: 20px; 
+              text-align: center; 
+              color: white; 
+            }
+            .header h1 { 
+              margin: 0; 
+              font-size: 20px; 
+              font-weight: 500; 
+            }
+            .content { 
+              padding: 30px 20px; 
+              text-align: left; 
+            }
+            .otp-section {
+              text-align: center;
+              margin: 25px 0;
+              padding: 20px;
+              background: #f8f9fa;
+              border-radius: 6px;
+              border-left: 4px solid #667eea;
+            }
+            .otp-label {
+              font-size: 14px;
+              color: #5f6368;
+              margin-bottom: 8px;
+            }
+            .otp-code { 
+              font-size: 32px; 
+              font-weight: 600; 
+              letter-spacing: 6px; 
+              color: #667eea;
+              font-family: 'Courier New', monospace;
+            }
+            .validity {
+              font-size: 12px;
+              color: #5f6368;
+              margin-top: 8px;
+            }
+            .message {
+              color: #3c4043;
+              font-size: 14px;
+              margin: 20px 0;
+            }
+            .warning {
+              background: #fff3cd;
+              border-left: 4px solid #ffc107;
+              padding: 12px;
+              margin: 15px 0;
+              border-radius: 4px;
+              font-size: 13px;
+              color: #856404;
+            }
+            .footer { 
+              background: #f8f9fa; 
+              padding: 15px 20px; 
+              text-align: center; 
+              color: #5f6368; 
+              font-size: 12px;
+              border-top: 1px solid #e8eaed;
+            }
+            .company {
+              font-weight: 500;
+              color: #667eea;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔐 Kode OTP Ganti Password</h1>
+            </div>
+            
+            <div class="content">
+              <div class="message">
+                Halo <strong>${fullName}</strong>,
+              </div>
+              
+              <div class="message">
+                Anda telah meminta untuk mengganti password akun Event Yukk Anda. Gunakan kode OTP berikut untuk melanjutkan:
+              </div>
+              
+              <div class="otp-section">
+                <div class="otp-label">Kode OTP Anda</div>
+                <div class="otp-code">${otpCode}</div>
+                <div class="validity">Berlaku selama 15 menit</div>
+              </div>
+              
+              <div class="warning">
+                <strong>⚠️ Peringatan Keamanan:</strong><br>
+                Jika Anda tidak meminta perubahan password ini, abaikan email ini dan pastikan akun Anda aman.
+              </div>
+              
+              <div class="message">
+                Masukkan kode OTP di halaman ganti password untuk menyelesaikan proses perubahan password.
+              </div>
+            </div>
+            
+            <div class="footer">
+              <div class="company">Event Yukk Platform</div>
+              <div>Email ini dikirim secara otomatis. Jangan balas email ini.</div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      return await this.sendEmail({
+        to: email,
+        subject,
+        html,
+        text: `Kode OTP untuk ganti password Anda adalah: ${otpCode}. Berlaku selama 15 menit.`
+      });
+    } catch (error) {
+      console.error('Error sending password change OTP:', error);
+      throw error;
     }
   }
 

@@ -1,31 +1,179 @@
 const { query } = require('../db');
 
 /**
- * Soft delete events that have ended
+ * Mark registrations as failed if user didn't attend (after attendance deadline)
+ */
+const markAbsentRegistrations = async () => {
+  try {
+    console.log('⏰ Checking for absent registrations...');
+    
+    // First, check if columns exist in registrations table
+    const [columns] = await query(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'registrations' 
+      AND COLUMN_NAME IN ('attendance_required', 'attendance_status', 'attendance_deadline')
+    `);
+    
+    const hasAttendanceColumns = columns.length === 3;
+    
+    if (!hasAttendanceColumns) {
+      console.log('⚠️ Attendance columns not found in registrations table. Using event_registrations table instead.');
+      
+      // Use event_registrations table which should have the columns
+      const now = new Date();
+      const [absentRegistrations] = await query(`
+        SELECT er.id, er.user_id, er.event_id, er.attendance_deadline, e.title as event_title
+        FROM event_registrations er
+        INNER JOIN events e ON er.event_id = e.id
+        WHERE er.attendance_required = TRUE
+          AND er.attendance_status = 'pending'
+          AND er.attendance_deadline IS NOT NULL
+          AND er.attendance_deadline < ?
+          AND er.status != 'cancelled'
+      `, [now]);
+      
+      if (absentRegistrations.length === 0) {
+        console.log('✅ No absent registrations to mark');
+        return { marked: 0 };
+      }
+      
+      console.log(`⚠️ Found ${absentRegistrations.length} registrations that missed attendance deadline`);
+      
+      let markedCount = 0;
+      for (const reg of absentRegistrations) {
+        try {
+          // Mark as absent/failed in event_registrations
+          await query(`
+            UPDATE event_registrations 
+            SET 
+              attendance_status = 'absent',
+              status = 'failed',
+              updated_at = NOW()
+            WHERE id = ?
+          `, [reg.id]);
+          
+          // Try to update registrations table if columns exist
+          try {
+            await query(`
+              UPDATE registrations 
+              SET 
+                attendance_status = 'absent',
+                status = 'failed',
+                updated_at = NOW()
+              WHERE user_id = ? AND event_id = ?
+            `, [reg.user_id, reg.event_id]);
+          } catch (err) {
+            // Ignore if registrations table doesn't have columns
+          }
+          
+          markedCount++;
+          console.log(`   ✗ Marked as absent: Event "${reg.event_title}" (Registration ID: ${reg.id})`);
+        } catch (err) {
+          console.error(`   ✗ Failed to mark registration ${reg.id} as absent:`, err.message);
+        }
+      }
+      
+      console.log(`✅ Marked ${markedCount} registrations as absent/failed`);
+      return { marked: markedCount };
+    }
+    
+    // If columns exist, use the original query
+    const now = new Date();
+    
+    // Find registrations that passed attendance deadline but didn't attend
+    const [absentRegistrations] = await query(`
+      SELECT r.id, r.user_id, r.event_id, r.attendance_deadline, e.title as event_title
+      FROM registrations r
+      INNER JOIN events e ON r.event_id = e.id
+      WHERE r.attendance_required = TRUE
+        AND r.attendance_status = 'pending'
+        AND r.attendance_deadline IS NOT NULL
+        AND r.attendance_deadline < ?
+        AND r.status != 'cancelled'
+    `, [now]);
+
+    if (absentRegistrations.length === 0) {
+      console.log('✅ No absent registrations to mark');
+      return { marked: 0 };
+    }
+
+    console.log(`⚠️ Found ${absentRegistrations.length} registrations that missed attendance deadline`);
+
+    let markedCount = 0;
+    for (const reg of absentRegistrations) {
+      try {
+        // Mark as absent/failed
+        await query(`
+          UPDATE registrations 
+          SET 
+            attendance_status = 'absent',
+            status = 'failed',
+            updated_at = NOW()
+          WHERE id = ?
+        `, [reg.id]);
+
+        // Also update event_registrations
+        await query(`
+          UPDATE event_registrations 
+          SET 
+            attendance_status = 'absent',
+            status = 'failed',
+            updated_at = NOW()
+          WHERE user_id = ? AND event_id = ?
+        `, [reg.user_id, reg.event_id]);
+
+        markedCount++;
+        console.log(`   ✗ Marked as absent: Event "${reg.event_title}" (Registration ID: ${reg.id})`);
+      } catch (err) {
+        console.error(`   ✗ Failed to mark registration ${reg.id} as absent:`, err.message);
+      }
+    }
+
+    console.log(`✅ Marked ${markedCount} registrations as absent/failed`);
+    return { marked: markedCount };
+
+  } catch (error) {
+    console.error('❌ Error in markAbsentRegistrations:', error);
+    throw error;
+  }
+};
+
+/**
+ * Soft delete events that have ended more than 1 month ago
  * - Mark event as archived (is_active = FALSE)
  * - Keep certificates intact
  * - Keep registration history intact
  * - Event won't show in public listings but data preserved
+ * - Users can still access certificates and history
  */
 const archiveEndedEvents = async () => {
   try {
     console.log('🧹 Starting automatic event archival...');
     
+    // First, mark absent registrations
+    await markAbsentRegistrations();
+    
     // Get current date/time
     const now = new Date();
     
-    // Find events that have ended (event_date + 1 day < now)
+    // Calculate date 1 month ago
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    
+    // Find events that ended more than 1 month ago
     const endedEvents = await query(`
       SELECT 
         id, 
         title, 
         event_date,
+        end_date,
         end_time
       FROM events 
       WHERE is_active = TRUE 
         AND status = 'published'
-        AND CONCAT(event_date, ' ', COALESCE(end_time, '23:59:59')) < ?
-    `, [now]);
+        AND CONCAT(COALESCE(end_date, event_date), ' ', COALESCE(end_time, '23:59:59')) < ?
+    `, [oneMonthAgo]);
 
     if (endedEvents.length === 0) {
       console.log('✅ No ended events to archive');
@@ -77,6 +225,7 @@ const archiveEndedEvents = async () => {
 /**
  * Get user's event history (including archived events)
  * Shows all events user has participated in
+ * User can still access certificates even for archived events
  */
 const getUserEventHistory = async (userId) => {
   try {
@@ -85,18 +234,20 @@ const getUserEventHistory = async (userId) => {
         e.id,
         e.title,
         e.event_date,
+        e.end_date,
         e.location,
         e.status,
         e.is_active,
-        r.registration_date,
+        e.has_certificate,
+        r.id as registration_id,
+        r.created_at as registration_date,
         r.status as registration_status,
-        r.attendance_status,
         c.id as certificate_id,
         c.certificate_code,
         c.issued_at as certificate_issued_at
-      FROM registrations r
+      FROM event_registrations r
       INNER JOIN events e ON r.event_id = e.id
-      LEFT JOIN certificates c ON c.registration_id = r.id
+      LEFT JOIN certificates c ON c.user_id = r.user_id AND c.event_id = e.id
       WHERE r.user_id = ?
       ORDER BY e.event_date DESC
     `, [userId]);
@@ -117,10 +268,12 @@ const getArchivedEvents = async () => {
       SELECT 
         e.*,
         COUNT(DISTINCT r.id) as total_participants,
-        COUNT(DISTINCT c.id) as total_certificates
+        COUNT(DISTINCT c.id) as total_certificates,
+        c2.name as category_name
       FROM events e
-      LEFT JOIN registrations r ON e.id = r.event_id
+      LEFT JOIN event_registrations r ON e.id = r.event_id
       LEFT JOIN certificates c ON c.event_id = e.id
+      LEFT JOIN categories c2 ON e.category_id = c2.id
       WHERE e.status = 'archived' OR e.is_active = FALSE
       GROUP BY e.id
       ORDER BY e.event_date DESC
@@ -158,13 +311,15 @@ const restoreArchivedEvent = async (eventId) => {
 /**
  * Permanently delete event (hard delete)
  * WARNING: This will delete certificates and history too!
+ * Only use this for spam/test events, not real events!
  */
 const permanentlyDeleteEvent = async (eventId) => {
   try {
     // Delete in order due to foreign key constraints
     await query('DELETE FROM certificates WHERE event_id = ?', [eventId]);
-    await query('DELETE FROM attendance WHERE event_id = ?', [eventId]);
-    await query('DELETE FROM registrations WHERE event_id = ?', [eventId]);
+    await query('DELETE FROM attendance_tokens WHERE event_id = ?', [eventId]);
+    await query('DELETE FROM event_registrations WHERE event_id = ?', [eventId]);
+    await query('DELETE FROM performers WHERE event_id = ?', [eventId]);
     await query('DELETE FROM events WHERE id = ?', [eventId]);
 
     console.log(`🗑️ Permanently deleted event ID: ${eventId}`);
@@ -177,6 +332,7 @@ const permanentlyDeleteEvent = async (eventId) => {
 
 module.exports = {
   archiveEndedEvents,
+  markAbsentRegistrations,
   getUserEventHistory,
   getArchivedEvents,
   restoreArchivedEvent,

@@ -1,5 +1,5 @@
 # 🔍 DATABASE CONNECTION AUDIT REPORT
-**EventHub Application - Database & API Connection Status**
+**Event Yukk Application - Database & API Connection Status**
 
 ---
 

@@ -11,6 +11,28 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(requireUser);
 
+// Check if user is registered for a specific event
+router.get('/check/:eventId', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    const [registrations] = await query(
+      'SELECT id, status FROM event_registrations WHERE user_id = ? AND event_id = ?',
+      [req.user.id, eventId]
+    );
+
+    return ApiResponse.success(res, {
+      is_registered: registrations.length > 0,
+      status: registrations.length > 0 ? registrations[0].status : null,
+      registration_id: registrations.length > 0 ? registrations[0].id : null
+    }, 'Registration status checked');
+
+  } catch (error) {
+    console.error('Check registration error:', error);
+    return ApiResponse.error(res, 'Failed to check registration');
+  }
+});
+
 // Get user's registrations
 router.get('/my-registrations', async (req, res) => {
   try {
@@ -27,17 +49,26 @@ router.get('/my-registrations', async (req, res) => {
 
     // Get total count
     const [countResult] = await query(
-      `SELECT COUNT(*) as total FROM event_registrations er ${whereClause}`,
+      `SELECT COUNT(*) as total FROM registrations er ${whereClause}`,
       params
     );
 
     // Get registrations with event info
     const [registrations] = await query(
-      `SELECT er.*, e.title as event_title, e.event_date, e.location, e.registration_fee,
+      `SELECT er.*, 
+              e.title as event_title, 
+              e.event_date, 
+              e.event_time,
+              e.location, 
+              e.price as registration_fee,
+              er.payment_amount,
+              er.payment_status,
+              at.token as attendance_token,
               c.name as category_name
-       FROM event_registrations er
+       FROM registrations er
        LEFT JOIN events e ON er.event_id = e.id
        LEFT JOIN categories c ON e.category_id = c.id
+       LEFT JOIN attendance_tokens at ON at.user_id = er.user_id AND at.event_id = er.event_id
        ${whereClause}
        ORDER BY er.created_at DESC 
        LIMIT ? OFFSET ?`,
@@ -68,7 +99,18 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     console.log('🚀 Registration request:', req.body);
     console.log('👤 User:', req.user);
 
-    const { event_id, payment_method = 'cash' } = req.body;
+    const {
+      event_id,
+      payment_method = 'cash',
+      full_name,
+      email,
+      phone,
+      address,
+      city,
+      province,
+      institution,
+      notes
+    } = req.body;
 
     // Check if event exists and is active
     const [events] = await query(
@@ -115,7 +157,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     // Check if event is full
     if (event.max_participants) {
       const [approvedRegistrations] = await query(
-        'SELECT COUNT(*) as count FROM event_registrations WHERE event_id = ? AND status = "approved"',
+        'SELECT COUNT(*) as count FROM event_registrations WHERE event_id = ? AND status = "confirmed"',
         [event_id]
       );
 
@@ -126,59 +168,147 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     }
 
     console.log('✅ Creating registration...');
-    // Create registration
-    const [result] = await query(
-      'INSERT INTO event_registrations (user_id, event_id, payment_method, status) VALUES (?, ?, ?, "approved")',
-      [req.user.id, event_id, payment_method]
-    );
+    const registrantName = (full_name || req.user.full_name || '').trim();
+    const registrantEmail = (email || req.user.email || '').trim();
+    const registrantPhone = (phone || req.user.phone || '').trim();
+    const registrantAddress = address || req.user.address || '';
+    const registrantCity = city || req.user.city || '';
+    const registrantProvince = province || req.user.province || '';
+    const registrantInstitution = institution || req.user.institution || '';
 
-    console.log('✅ Registration created:', result.insertId);
+    const isFreeEvent = event.is_free === 1 || parseFloat(event.price || 0) === 0;
 
-    // Generate attendance token
-    console.log('🔑 Generating token...');
-    const tokenData = await TokenService.createAttendanceToken(
-      result.insertId,
-      req.user.id,
-      event_id
-    );
+    const registrationStatus = isFreeEvent ? 'confirmed' : 'pending';
+    const paymentStatus = isFreeEvent ? 'paid' : 'pending';
+    const paymentAmount = parseFloat(event.price || 0);
 
-    console.log('✅ Token generated:', tokenData.token);
+    // Calculate attendance deadline (end of event day + 1 hour buffer)
+    const eventEndTime = event.end_time || '23:59:59';
+    const eventEndDate = event.end_date || event.event_date;
+    const attendanceDeadline = new Date(`${eventEndDate} ${eventEndTime}`);
+    attendanceDeadline.setHours(attendanceDeadline.getHours() + 1); // 1 hour after event ends
 
-    // Send token via email
+    // Save to primary registrations table (analytics & user profile)
+    let primaryRegistrationId = null;
     try {
-      console.log('📧 Sending token email...');
-      await TokenService.sendTokenEmail(
-        req.user.email,
-        req.user.full_name,
-        event.title,
-        tokenData.token
+      const [primaryInsert] = await query(
+        `INSERT INTO registrations 
+         (user_id, event_id, full_name, phone, email, address, city, province, institution, payment_method, status, payment_status, payment_amount, attendance_required, attendance_status, attendance_deadline, notes) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, 'pending', ?, ?)`,
+        [
+          req.user.id,
+          event_id,
+          registrantName,
+          registrantPhone,
+          registrantEmail,
+          registrantAddress,
+          registrantCity,
+          registrantProvince,
+          registrantInstitution,
+          payment_method,
+          registrationStatus,
+          paymentStatus,
+          paymentAmount,
+          attendanceDeadline,
+          notes || ''
+        ]
       );
-      console.log('✅ Token email sent');
-    } catch (emailError) {
-      console.error('❌ Failed to send token email:', emailError);
-      // Don't fail registration if email fails
+      primaryRegistrationId = primaryInsert.insertId;
+      console.log('✅ Registration record stored:', primaryRegistrationId);
+    } catch (primaryError) {
+      console.warn('⚠️ Failed to insert into registrations table:', primaryError.message);
+      // Continue even if legacy table fails
+    }
+
+    // Create event registration (main reference for attendance & admin screens)
+    const [eventInsert] = await query(
+      `INSERT INTO event_registrations
+       (user_id, event_id, full_name, phone, email, address, city, province, institution, payment_method, payment_amount, payment_status, status, attendance_required, attendance_status, attendance_deadline, notes) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, 'pending', ?, ?)`,
+      [
+        req.user.id,
+        event_id,
+        registrantName,
+        registrantPhone,
+        registrantEmail,
+        registrantAddress,
+        registrantCity,
+        registrantProvince,
+        registrantInstitution,
+        payment_method,
+        paymentAmount,
+        paymentStatus,
+        registrationStatus,
+        attendanceDeadline,
+        notes || ''
+      ]
+    );
+
+    const eventRegistrationId = eventInsert.insertId;
+    console.log('✅ Event registration created:', eventRegistrationId);
+
+    let tokenData = null;
+
+    if (registrationStatus === 'confirmed') {
+      // Generate attendance token
+      console.log('🔑 Generating token...');
+      tokenData = await TokenService.createAttendanceToken(
+        eventRegistrationId,
+        req.user.id,
+        event_id
+      );
+
+      console.log('✅ Token generated:', tokenData.token);
+
+      // Send token via email
+      try {
+        console.log('📧 Sending token email...');
+        await TokenService.sendTokenEmail(
+          registrantEmail || req.user.email,
+          registrantName || req.user.full_name,
+          event.title,
+          tokenData.token
+        );
+        console.log('✅ Token email sent');
+      } catch (emailError) {
+        console.error('❌ Failed to send token email:', emailError);
+        // Don't fail registration if email fails
+      }
+    } else {
+      console.log('ℹ️ Registration pending payment - token will be generated after confirmation');
     }
 
     // Get created registration
     const [registrations] = await query(
-      `SELECT er.*, e.title as event_title, e.event_date, e.location, e.registration_fee
-       FROM event_registrations er
-       LEFT JOIN events e ON er.event_id = e.id
-       WHERE er.id = ?`,
-      [result.insertId]
+      `SELECT r.*, e.title as event_title, e.event_date, e.location, e.price as registration_fee
+       FROM event_registrations r
+       LEFT JOIN events e ON r.event_id = e.id
+       WHERE r.id = ?`,
+      [eventRegistrationId]
     );
 
     console.log('✅ Registration completed successfully');
     return ApiResponse.created(res, {
       ...registrations[0],
-      token: tokenData.token,
-      tokenExpiresAt: tokenData.expiresAt
-    }, 'Registration created successfully. Attendance token has been sent to your email.');
+      token: tokenData?.token || null,
+      tokenExpiresAt: tokenData?.expiresAt || null
+    }, registrationStatus === 'confirmed'
+      ? 'Registration created successfully. Attendance token has been sent to your email.'
+      : 'Registration created successfully. Silakan selesaikan pembayaran untuk menerima token kehadiran.'
+    );
 
   } catch (error) {
     console.error('❌ Create registration error:', error);
     console.error('❌ Error stack:', error.stack);
-    return ApiResponse.error(res, 'Failed to create registration');
+    console.error('❌ Error message:', error.message);
+    
+    // Provide more specific error message
+    let errorMessage = 'Failed to create registration';
+    if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    return ApiResponse.error(res, errorMessage, error.message);
   }
 });
 
@@ -189,7 +319,7 @@ router.put('/:id/cancel', async (req, res) => {
 
     // Check if registration exists and belongs to user
     const [registrations] = await query(
-      'SELECT * FROM event_registrations WHERE id = ? AND user_id = ?',
+      'SELECT * FROM registrations WHERE id = ? AND user_id = ?',
       [id, req.user.id]
     );
 
@@ -204,13 +334,13 @@ router.put('/:id/cancel', async (req, res) => {
       return ApiResponse.badRequest(res, 'Registration is already cancelled');
     }
 
-    if (registration.status === 'approved') {
-      return ApiResponse.badRequest(res, 'Cannot cancel approved registration');
+    if (registration.status === 'confirmed') {
+      return ApiResponse.badRequest(res, 'Cannot cancel confirmed registration');
     }
 
     // Cancel registration
     await query(
-      'UPDATE event_registrations SET status = "cancelled", updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE registrations SET status = "cancelled", updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [id]
     );
 
@@ -228,9 +358,9 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     const [registrations] = await query(
-      `SELECT er.*, e.title as event_title, e.event_date, e.location, e.registration_fee,
+      `SELECT er.*, e.title as event_title, e.event_date, e.location, e.price as registration_fee,
               c.name as category_name
-       FROM event_registrations er
+       FROM registrations er
        LEFT JOIN events e ON er.event_id = e.id
        LEFT JOIN categories c ON e.category_id = c.id
        WHERE er.id = ? AND er.user_id = ?`,

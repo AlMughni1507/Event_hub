@@ -3,6 +3,7 @@ const { query } = require('../db');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const ApiResponse = require('../middleware/response');
 const XLSX = require('xlsx');
+const TokenService = require('../services/tokenService');
 
 const router = express.Router();
 
@@ -317,13 +318,20 @@ router.put('/registrations/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!['pending', 'approved', 'rejected', 'cancelled'].includes(status)) {
+    if (!['pending', 'approved', 'rejected', 'cancelled', 'confirmed'].includes(status)) {
       return ApiResponse.badRequest(res, 'Invalid status');
     }
 
-    // Check if registration exists
     const [existingRegistrations] = await query(
-      'SELECT id FROM event_registrations WHERE id = ?',
+      `SELECT r.*, 
+              u.full_name as user_full_name,
+              u.email as user_email,
+              e.title as event_title,
+              e.has_certificate
+       FROM event_registrations r
+       LEFT JOIN users u ON r.user_id = u.id
+       LEFT JOIN events e ON r.event_id = e.id
+       WHERE r.id = ?`,
       [id]
     );
 
@@ -331,14 +339,62 @@ router.put('/registrations/:id/status', async (req, res) => {
       return ApiResponse.notFound(res, 'Registration not found');
     }
 
-    // Update status
     await query(
-      'UPDATE event_registrations SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [status, id]
+      `UPDATE event_registrations 
+       SET status = ?, 
+           payment_status = CASE WHEN ? IN ('approved','confirmed') THEN 'paid' ELSE payment_status END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [status, status, id]
     );
 
-    return ApiResponse.success(res, null, 'Registration status updated successfully');
+    const registration = existingRegistrations[0];
+    let tokenPayload = null;
 
+    if (['approved', 'confirmed'].includes(status)) {
+      const [existingTokens] = await query(
+        'SELECT token, expires_at FROM attendance_tokens WHERE registration_id = ? LIMIT 1',
+        [id]
+      );
+
+      if (existingTokens.length > 0) {
+        tokenPayload = {
+          token: existingTokens[0].token,
+          expiresAt: existingTokens[0].expires_at,
+        };
+      } else {
+        tokenPayload = await TokenService.createAttendanceToken(
+          id,
+          registration.user_id,
+          registration.event_id
+        );
+      }
+
+      const recipientEmail = registration.email || registration.user_email;
+      const recipientName = registration.full_name || registration.user_full_name || 'Peserta';
+
+      if (recipientEmail) {
+        try {
+          await TokenService.sendTokenEmail(
+            recipientEmail,
+            recipientName,
+            registration.event_title || 'Event Yukk Event',
+            tokenPayload.token
+          );
+        } catch (emailError) {
+          console.error('Failed to send attendance token email:', emailError);
+        }
+      }
+    }
+
+    return ApiResponse.success(
+      res,
+      {
+        token: tokenPayload?.token || null,
+        tokenExpiresAt: tokenPayload?.expiresAt || null,
+      },
+      'Registration status updated successfully'
+    );
   } catch (error) {
     console.error('Update registration status error:', error);
     return ApiResponse.error(res, 'Failed to update registration status');
@@ -468,15 +524,14 @@ router.get('/export/participants/:eventId', async (req, res) => {
     const [participants] = await query(`
       SELECT 
         er.id,
-        u.full_name,
-        u.email,
-        u.phone,
+        COALESCE(u.full_name) as full_name,
+        COALESCE(u.email) as email,
+        COALESCE(u.phone) as phone,
         er.status,
         er.registration_date,
-        er.attendance_status,
         er.payment_status,
         er.created_at
-      FROM event_registrations er
+      FROM registrations er
       LEFT JOIN users u ON er.user_id = u.id
       WHERE er.event_id = ?
       ORDER BY er.created_at DESC
@@ -489,7 +544,6 @@ router.get('/export/participants/:eventId', async (req, res) => {
       'Email': participant.email,
       'No. Telepon': participant.phone,
       'Status Pendaftaran': participant.status,
-      'Status Kehadiran': participant.attendance_status || 'Belum Hadir',
       'Status Pembayaran': participant.payment_status || 'Belum Dibayar',
       'Tanggal Daftar': new Date(participant.created_at).toLocaleDateString('id-ID'),
       'Waktu Daftar': new Date(participant.created_at).toLocaleTimeString('id-ID')

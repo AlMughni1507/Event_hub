@@ -19,6 +19,7 @@ import ArticleDetailPage from './pages/blog/ArticleDetailPage';
 import SettingsPage from './pages/settings/profile';
 import AttendancePage from './pages/attendance/AttendancePage';
 import ReviewsPage from './pages/reviews/ReviewsPage';
+import MyEvents from './pages/user/MyEvents';
 // Removed separate pages - now integrated into Settings
 
 // Admin Components
@@ -34,6 +35,8 @@ import StatisticsDashboard from './pages/admin/StatisticsDashboard';
 import CertificateManagement from './pages/admin/CertificateManagement';
 import BlogManagement from './pages/admin/BlogManagement';
 import ReviewsManagement from './pages/admin/ReviewsManagement';
+import ReportsManagement from './pages/admin/ReportsManagement';
+import ContactManagement from './pages/admin/ContactManagement';
 
 import './styles/theme.css';
 
@@ -112,6 +115,7 @@ const AnimatedRoutes = () => {
           <Route path="/blog" element={<PageTransition><BlogPage /></PageTransition>} />
           <Route path="/blog/:slug" element={<PageTransition><ArticleDetailPage /></PageTransition>} />
           <Route path="/settings" element={<PageTransition><SettingsPage /></PageTransition>} />
+          <Route path="/my-events" element={<PageTransition><MyEvents /></PageTransition>} />
           <Route path="/reviews" element={<PageTransition><ReviewsPage /></PageTransition>} />
           <Route path="/attendance/:eventId" element={<PageTransition><AttendancePage /></PageTransition>} />
             
@@ -129,6 +133,8 @@ const AnimatedRoutes = () => {
             <Route path="certificates" element={<CertificateManagement />} />
             <Route path="blogs" element={<BlogManagement />} />
             <Route path="reviews" element={<ReviewsManagement />} />
+            <Route path="reports" element={<ReportsManagement />} />
+            <Route path="contacts" element={<ContactManagement />} />
           </Route>
             
           {/* Redirect any unknown routes to home */}

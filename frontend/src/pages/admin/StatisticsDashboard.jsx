@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, TrendingUp, BarChart3 } from 'lucide-react';
+import { Calendar, Users, TrendingUp, BarChart3, Lightbulb, Award } from 'lucide-react';
 import { analyticsAPI } from '../../services/api';
 import BarChart from '../../components/charts/BarChart';
 
@@ -63,16 +63,16 @@ const StatisticsDashboard = () => {
   const avgParticipantsPerEvent = totalEvents > 0 ? Math.round(totalParticipants / totalEvents) : 0;
 
   const StatCard = ({ title, value, icon, color, subtitle }) => (
-    <div className="bg-white p-6 rounded-2xl border border-gray-200 hover:border-gray-300 transition-colors shadow-sm">
+    <div className="bg-white p-5 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors shadow-sm">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-600 text-sm font-medium">{title}</p>
-          <p className={`text-3xl font-bold ${color.replace('text-', 'text-').replace('-400', '-600')}`}>{value}</p>
+        <div className="flex-1">
+          <p className="text-gray-600 text-sm font-medium mb-1">{title}</p>
+          <p className={`text-2xl font-bold ${color}`}>{value}</p>
           {subtitle && (
-            <p className="text-gray-500 text-sm mt-1">{subtitle}</p>
+            <p className="text-gray-500 text-xs mt-1.5">{subtitle}</p>
           )}
         </div>
-        <div className="text-4xl opacity-80">
+        <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center">
           {icon}
         </div>
       </div>
@@ -95,7 +95,10 @@ const StatisticsDashboard = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-black mb-2">📊 Statistics Dashboard</h1>
+          <h1 className="text-3xl font-bold text-black mb-2 flex items-center gap-2">
+            <BarChart3 className="w-8 h-8 text-blue-600" />
+            Statistics Dashboard
+          </h1>
           <p className="text-gray-600">Comprehensive event and participant analytics</p>
         </div>
         <div className="mt-4 md:mt-0">
@@ -112,26 +115,26 @@ const StatisticsDashboard = () => {
       </div>
 
       {/* Summary Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
           title={`Total Events ${selectedYear}`}
           value={totalEvents}
-          icon="🎪"
-          color="text-blue-400"
+          icon={<Calendar className="w-6 h-6 text-blue-600" />}
+          color="text-blue-600"
           subtitle="Published events"
         />
         <StatCard
           title={`Total Participants ${selectedYear}`}
           value={totalParticipants}
-          icon={<Users className="w-8 h-8 text-green-400" />}
-          color="text-green-400"
+          icon={<Users className="w-6 h-6 text-green-600" />}
+          color="text-green-600"
           subtitle="Attended events"
         />
         <StatCard
           title="Average Participants"
           value={avgParticipantsPerEvent}
-          icon="📈"
-          color="text-purple-400"
+          icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
+          color="text-purple-600"
           subtitle="Per event"
         />
       </div>
@@ -167,9 +170,10 @@ const StatisticsDashboard = () => {
       />
 
       {/* Top Events Details Table */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-        <h3 className="text-xl font-bold text-black mb-6 flex items-center">
-          🏆 Top Events Details
+      <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-bold text-black mb-5 flex items-center gap-2">
+          <Award className="w-5 h-5 text-amber-600" />
+          Top Events Details
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -210,10 +214,11 @@ const StatisticsDashboard = () => {
       </div>
 
       {/* Insights Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-bold text-black mb-4 flex items-center">
-            💡 Key Insights
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+          <h3 className="text-base font-bold text-black mb-4 flex items-center gap-2">
+            <Lightbulb className="w-5 h-5 text-yellow-600" />
+            Key Insights
           </h3>
           <div className="space-y-3">
             <div className="flex items-center p-3 bg-gray-50 rounded-lg">
@@ -237,9 +242,10 @@ const StatisticsDashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-bold text-black mb-4 flex items-center">
-            📈 Performance Metrics
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+          <h3 className="text-base font-bold text-black mb-4 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-blue-600" />
+            Performance Metrics
           </h3>
           <div className="space-y-4">
             <div>

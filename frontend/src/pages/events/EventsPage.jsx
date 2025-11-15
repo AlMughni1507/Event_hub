@@ -182,7 +182,7 @@ const EventsPage = () => {
               <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Calendar className="w-6 h-6 text-white" />
               </div>
-              <span className="font-bebas text-2xl text-white tracking-wider">EVENTHUB</span>
+              <span className="font-bebas text-2xl text-white tracking-wider">EVENT YUKK</span>
             </div>
 
             {/* Desktop Menu */}
@@ -194,14 +194,7 @@ const EventsPage = () => {
             </div>
 
             {/* CTA Button */}
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => navigate('/login')}
-                className="hidden md:block font-poppins px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-xl"
-              >
-                Get Started
-              </button>
-              
+            <div className="flex items-center gap-4">          
               {/* Mobile Menu Button */}
               <button className="md:hidden text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

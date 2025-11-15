@@ -96,8 +96,44 @@ const validateRegistration = [
   
   body('payment_method')
     .optional()
-    .isIn(['cash', 'transfer', 'card'])
-    .withMessage('Payment method must be cash, transfer, or card')
+    .isIn(['cash', 'transfer', 'card', 'free'])
+    .withMessage('Payment method must be cash, transfer, card, or free'),
+
+  body('full_name')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 150 })
+    .withMessage('Full name must be between 2 and 150 characters'),
+
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('Please provide a valid email address'),
+
+  body('phone')
+    .optional()
+    .matches(/^[0-9+\-\s()]{8,20}$/)
+    .withMessage('Phone number must be 8-20 digits and can contain +, -, spaces, and parentheses'),
+
+  body('address')
+    .optional()
+    .isLength({ min: 5, max: 255 })
+    .withMessage('Address must be between 5 and 255 characters'),
+
+  body('city')
+    .optional()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('City must be between 2 and 100 characters'),
+
+  body('province')
+    .optional()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Province must be between 2 and 100 characters'),
+
+  body('institution')
+    .optional()
+    .isLength({ max: 150 })
+    .withMessage('Institution must not exceed 150 characters')
 ];
 
 // Validation middleware

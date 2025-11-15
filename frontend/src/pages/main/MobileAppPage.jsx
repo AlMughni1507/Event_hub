@@ -34,12 +34,48 @@ const mobileAppAnimationStyles = `
     100% { transform: translateX(0); opacity: 1; }
   }
 
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+
+  @keyframes rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-10px) rotate(5deg); }
+    50% { transform: translateY(0) rotate(0deg); }
+    75% { transform: translateY(-10px) rotate(-5deg); }
+  }
+
   .animate-slide-in-bottom { animation: slideInFromBottom 0.8s ease-out forwards; }
   .animate-fade-in-scale { animation: fadeInScale 0.8s ease-out forwards; }
   .animate-float-phone { animation: floatPhone 4s ease-in-out infinite; }
   .animate-pulse-glow { animation: pulseGlow 3s ease-in-out infinite; }
   .animate-slide-in-left { animation: slideInLeft 0.8s ease-out forwards; }
   .animate-slide-in-right { animation: slideInRight 0.8s ease-out forwards; }
+  .animate-float { animation: float 3s ease-in-out infinite; }
+  .animate-rotate { animation: rotate 20s linear infinite; }
+  .animate-shimmer { 
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    background-size: 1000px 100%;
+    animation: shimmer 3s infinite;
+  }
+  .animate-bounce-slow { animation: bounce 2s ease-in-out infinite; }
+  .animate-wave { animation: wave 3s ease-in-out infinite; }
   
   .stagger-1 { animation-delay: 0.1s; }
   .stagger-2 { animation-delay: 0.2s; }
@@ -137,7 +173,7 @@ const MobileAppPage = () => {
                 <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <Calendar className="w-6 h-6 text-white" />
                 </div>
-                <span className="font-bebas text-2xl text-white tracking-wider">EVENTHUB</span>
+                <span className="font-bebas text-2xl text-white tracking-wider">EVENT YUKK</span>
               </div>
 
               {/* Desktop Menu */}
@@ -170,17 +206,35 @@ const MobileAppPage = () => {
 
         {/* Hero Section */}
         <section className="relative pt-32 pb-20 bg-gradient-to-br from-purple-900 via-purple-800 to-black overflow-hidden">
-          {/* Floating decorative elements - Pink particles */}
-          <div className="absolute inset-0 opacity-20">
-            {[...Array(20)].map((_, i) => (
+          {/* Floating decorative elements - Pink particles with dynamic animations */}
+          <div className="absolute inset-0 opacity-20 overflow-hidden">
+            {[...Array(30)].map((_, i) => (
               <div
                 key={i}
-                className="absolute w-2 h-2 bg-pink-400 rounded-full"
+                className="absolute bg-pink-400 rounded-full animate-float"
                 style={{
                   left: `${Math.random() * 100}%`,
                   top: `${Math.random() * 100}%`,
-                  animation: `float ${3 + Math.random() * 2}s ease-in-out infinite`,
-                  animationDelay: `${Math.random() * 2}s`
+                  width: `${2 + Math.random() * 4}px`,
+                  height: `${2 + Math.random() * 4}px`,
+                  animation: `float ${3 + Math.random() * 3}s ease-in-out infinite`,
+                  animationDelay: `${Math.random() * 3}s`
+                }}
+              ></div>
+            ))}
+            {/* Rotating gradient orbs */}
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={`orb-${i}`}
+                className="absolute rounded-full blur-3xl animate-rotate"
+                style={{
+                  left: `${20 + i * 20}%`,
+                  top: `${20 + i * 15}%`,
+                  width: `${100 + i * 50}px`,
+                  height: `${100 + i * 50}px`,
+                  background: `radial-gradient(circle, rgba(236,72,153,0.3), rgba(147,51,234,0.2))`,
+                  animation: `rotate ${15 + i * 5}s linear infinite`,
+                  animationDelay: `${i * 2}s`
                 }}
               ></div>
             ))}
@@ -197,13 +251,13 @@ const MobileAppPage = () => {
                 </div>
                 
                 <h1 className="text-5xl md:text-6xl font-bebas font-black text-white mb-6 leading-tight">
-                  EVENTHUB
+                  EVENT YUKK
                   <span className="block text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">
                     MOBILE APP
                   </span>
                 </h1>
                 <p className="text-xl text-gray-300 mb-8 leading-relaxed font-poppins">
-                  Nikmati pengalaman EventHub yang lebih personal dan mudah diakses kapan saja, 
+                  Nikmati pengalaman Event Yukk yang lebih personal dan mudah diakses kapan saja, 
                   di mana saja melalui aplikasi mobile kami. Temukan, daftar, dan kelola event 
                   favorit Anda dengan mudah.
                 </p>
@@ -281,7 +335,7 @@ const MobileAppPage = () => {
                               </svg>
                             </div>
                             <div>
-                              <h3 className="font-bold text-sm">EventHub</h3>
+                              <h3 className="font-bold text-sm">Event Yukk</h3>
                               <p className="text-xs text-gray-300">Discover Events</p>
                             </div>
                           </div>
@@ -436,7 +490,7 @@ const MobileAppPage = () => {
                 FITUR UNGGULAN
               </h2>
               <p className="text-xl text-gray-300 max-w-3xl mx-auto font-poppins">
-                Aplikasi mobile EventHub dilengkapi dengan berbagai fitur canggih untuk 
+                Aplikasi mobile Event Yukk dilengkapi dengan berbagai fitur canggih untuk 
                 memberikan pengalaman terbaik dalam mengelola event Anda.
               </p>
             </div>
@@ -484,7 +538,7 @@ const MobileAppPage = () => {
                 PREVIEW APLIKASI
               </h2>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto font-poppins">
-                Lihat tampilan dan antarmuka aplikasi EventHub yang intuitif dan modern.
+                Lihat tampilan dan antarmuka aplikasi Event Yukk yang intuitif dan modern.
               </p>
             </div>
 
@@ -535,7 +589,7 @@ const MobileAppPage = () => {
               </h2>
               <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto font-poppins">
                 Bergabunglah dengan ribuan pengguna yang sudah merasakan kemudahan 
-                mengelola event melalui aplikasi EventHub.
+                mengelola event melalui aplikasi Event Yukk.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
@@ -570,7 +624,7 @@ const MobileAppPage = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-bold">EventHub Mobile</h3>
+                <h3 className="text-2xl font-bold">Event Yukk Mobile</h3>
               </div>
               <p className="text-gray-400 mb-8 max-w-md mx-auto">
                 Aplikasi mobile terdepan untuk mengelola dan menemukan event terbaik di Indonesia.
@@ -578,7 +632,7 @@ const MobileAppPage = () => {
               
               <div className="border-t border-gray-800 pt-8">
                 <p className="text-gray-400">
-                  © 2024 EventHub. All rights reserved.
+                  © 2024 Event Yukk. All rights reserved.
                 </p>
               </div>
             </div>
