@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Instagram, ExternalLink } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import Footer from '../../components/Footer';
+import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Clock, Tag, CheckCircle } from 'lucide-react';
 
 const EventDetailModern = () => {
   const { id } = useParams();
@@ -11,283 +11,51 @@ const EventDetailModern = () => {
   const { isAuthenticated, user } = useAuth();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [registering, setRegistering] = useState(false);
-  const [performers, setPerformers] = useState([]);
-  const [isRegistered, setIsRegistered] = useState(false);
-  const [checkingRegistration, setCheckingRegistration] = useState(false);
-  const [participantCount, setParticipantCount] = useState(0);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchEventDetails();
-    fetchPerformers();
+    fetchEvent();
   }, [id]);
 
-  const fetchEventDetails = async () => {
+  const fetchEvent = async () => {
     try {
+      setLoading(true);
       const response = await api.get(`/events/${id}`);
-      const eventData = response.data.event || response.data;
+      // Response interceptor returns response.data which is { success, message, data }
+      // So event is in response.data
+      const eventData = response?.data || response;
+      console.log('Event data:', eventData);
+      console.log('Event image_url:', eventData?.image_url);
       setEvent(eventData);
-      setParticipantCount(eventData?.approved_registrations || 0);
     } catch (error) {
       console.error('Error fetching event:', error);
+      setError('Event tidak ditemukan atau gagal dimuat');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    const checkRegistration = async () => {
-      if (!event || !isAuthenticated || !user) {
-        setIsRegistered(false);
-        setCheckingRegistration(false);
-        return;
-      }
-
-      setCheckingRegistration(true);
-      try {
-        const response = await api.get(`/registrations/check/${event.id}`);
-        // API interceptor returns response.data
-        const responseData = response?.data || response;
-        if (responseData?.success !== false) {
-          const checkData = responseData?.data || responseData;
-          setIsRegistered(checkData?.is_registered || false);
-        } else {
-          setIsRegistered(false);
-        }
-      } catch (error) {
-        console.error('Error checking registration:', error);
-        setIsRegistered(false);
-      } finally {
-        setCheckingRegistration(false);
-      }
-    };
-
-    checkRegistration();
-  }, [event, isAuthenticated, user]);
-
-  const fetchPerformers = async () => {
-    try {
-      const response = await api.get(`/performers/event/${id}`);
-      // Handle different response structures
-      const performers = response?.data?.performers || response?.performers || response?.data || [];
-      setPerformers(Array.isArray(performers) ? performers : []);
-    } catch (error) {
-      console.error('Error fetching performers:', error);
-      setPerformers([]);
-    }
-  };
-
-  const handleRegister = async () => {
-    if (!event) return;
-
-    const isFreeEvent = event.is_free || event.price === 0 || event.registration_fee === 0;
-    const isFull =
-      event.max_participants &&
-      participantCount >= event.max_participants;
-
-    if (!isAuthenticated) {
-      if (window.confirm('Anda harus login terlebih dahulu. Lanjutkan ke halaman login?')) {
-        navigate('/login', { state: { from: window.location.pathname } });
-      }
-      return;
-    }
-
-    if (isRegistered) {
-      alert('Anda sudah terdaftar pada event ini.');
-      return;
-    }
-
-    if (isFull) {
-      alert('Maaf, kuota peserta sudah penuh.');
-      return;
-    }
-
-    if (!window.confirm('Apakah Anda yakin ingin mendaftar event ini?')) {
-      return;
-    }
-
-    setRegistering(true);
-    try {
-      // Validate user has required data for free events
-      if (isFreeEvent) {
-        if (!user?.full_name || user.full_name.trim().length < 2) {
-          alert('❌ Nama lengkap wajib diisi di profil Anda. Silakan lengkapi profil terlebih dahulu.');
-          navigate('/settings');
-          setRegistering(false);
-          return;
-        }
-        if (!user?.email || !user.email.includes('@')) {
-          alert('❌ Email wajib diisi di profil Anda. Silakan lengkapi profil terlebih dahulu.');
-          navigate('/settings');
-          setRegistering(false);
-          return;
-        }
-      }
-
-      // Prepare payload with all required fields
-      const payload = {
-        event_id: event.id,
-        payment_method: isFreeEvent ? 'free' : 'cash',
-        full_name: user?.full_name || user?.username || '',
-        email: user?.email || '',
-        phone: user?.phone || user?.phone_number || '',
-        address: user?.address || '',
-        city: user?.city || '',
-        province: user?.province || '',
-        institution: user?.institution || '',
-        notes: ''
-      };
-
-      console.log('📤 Sending registration payload:', payload);
-      console.log('📤 Is Free Event:', isFreeEvent);
-      console.log('📤 User:', user);
-
-      const response = await api.post('/registrations', payload);
-      
-      console.log('📥 Registration response:', response);
-      
-      // API interceptor returns response.data which is { success, message, data }
-      // But sometimes it might be the full response object
-      const responseData = response?.data || response;
-      const success = responseData?.success !== false;
-      const message = responseData?.message || 'Registrasi berhasil!';
-
-      if (success) {
-        if (isFreeEvent) {
-          // Free event - registration confirmed immediately
-          setIsRegistered(true);
-          setParticipantCount((prev) => prev + 1);
-          alert('✅ Pendaftaran berhasil! Token kehadiran telah dikirim ke email Anda.');
-          await fetchEventDetails();
-          // Re-check registration status
-          try {
-            const checkResponse = await api.get(`/registrations/check/${event.id}`);
-            if (checkResponse?.data?.success) {
-              setIsRegistered(checkResponse.data.data?.is_registered || false);
-            }
-          } catch (checkError) {
-            console.error('Error checking registration:', checkError);
-          }
-        } else {
-          // Paid event - redirect to payment
-          const registrationData = responseData?.data || responseData;
-          const registrationId = registrationData?.id;
-          
-          if (registrationId) {
-            // Create payment transaction
-            try {
-              const paymentResponse = await api.post('/payments/create-transaction', {
-                event_id: event.id,
-                registration_id: registrationId
-              });
-              
-              const paymentData = paymentResponse?.data || paymentResponse;
-              
-              if (paymentData?.token && paymentData?.client_key) {
-                // Load Midtrans Snap.js dynamically if not already loaded
-                const loadSnapAndPay = () => {
-                  if (window.snap) {
-                    window.snap.pay(paymentData.token, {
-                      onSuccess: function(result) {
-                        console.log('Payment success:', result);
-                        navigate(`/payment/success?order_id=${result.order_id}`);
-                      },
-                      onPending: function(result) {
-                        console.log('Payment pending:', result);
-                        navigate(`/payment/pending?order_id=${result.order_id}`);
-                      },
-                      onError: function(result) {
-                        console.log('Payment error:', result);
-                        navigate(`/payment/error?order_id=${result.order_id}`);
-                      },
-                      onClose: function() {
-                        console.log('Payment popup closed');
-                        alert('Pembayaran dibatalkan. Anda dapat mencoba lagi nanti.');
-                      }
-                    });
-                  } else {
-                    console.error('Midtrans Snap.js not loaded');
-                    alert('Gagal memuat payment gateway. Silakan refresh halaman dan coba lagi.');
-                  }
-                };
-
-                if (!window.snap) {
-                  const script = document.createElement('script');
-                  script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
-                  script.setAttribute('data-client-key', paymentData.client_key);
-                  script.onload = loadSnapAndPay;
-                  script.onerror = () => {
-                    alert('Gagal memuat payment gateway. Silakan coba lagi.');
-                  };
-                  document.head.appendChild(script);
-                } else {
-                  loadSnapAndPay();
-                }
-              } else {
-                throw new Error('Failed to get payment token');
-              }
-            } catch (paymentError) {
-              console.error('Payment error:', paymentError);
-              alert('Registrasi berhasil, tetapi gagal membuat transaksi pembayaran. Silakan hubungi admin.');
-            }
-          } else {
-            alert('Registrasi berhasil! Silakan selesaikan pembayaran.');
-            navigate('/settings');
-          }
-        }
-      } else {
-        throw new Error(responseData?.message || 'Gagal melakukan registrasi');
-      }
-    } catch (error) {
-      console.error('❌ Error registering:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        fullError: error
-      });
-      
-      let errorMessage = 'Gagal melakukan registrasi. Silakan coba lagi.';
-      
-      // API interceptor already processes error.response.data
-      const errorData = error.response?.data || error;
-      
-      if (errorData) {
-        // Handle validation errors (422)
-        if (errorData.errors && Array.isArray(errorData.errors)) {
-          errorMessage = errorData.errors.map(e => `${e.field}: ${e.message}`).join('\n');
-        } 
-        // Handle error message
-        else if (errorData.message) {
-          errorMessage = errorData.message;
-        } 
-        // Handle error field
-        else if (errorData.error) {
-          errorMessage = errorData.error;
-        }
-        // Handle string error
-        else if (typeof errorData === 'string') {
-          errorMessage = errorData;
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      alert(`❌ ${errorMessage}\n\nSilakan cek console untuk detail lebih lanjut.`);
-    } finally {
-      setRegistering(false);
-    }
-  };
-
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('id-ID', {
-      day: 'numeric',
+  const formatDate = (dateString) => {
+    if (!dateString) return 'TBA';
+    return new Date(dateString).toLocaleDateString('id-ID', {
+      weekday: 'long',
+      year: 'numeric',
       month: 'long',
-      year: 'numeric'
+      day: 'numeric'
     });
   };
 
-  const formatPrice = (price) => {
+  const formatTime = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatPrice = (price, isFree) => {
+    if (isFree) return 'Gratis';
+    if (!price || price === 0) return 'Gratis';
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
@@ -295,257 +63,223 @@ const EventDetailModern = () => {
     }).format(price);
   };
 
+  const handleRegister = () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/events/${id}` } });
+      return;
+    }
+    navigate(`/register-event/${id}`);
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
-      </div>
-    );
-  }
-
-  if (!event) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Event tidak ditemukan</h2>
-          <button onClick={() => navigate('/events')} className="text-purple-600 hover:underline">
-            Kembali ke Events
-          </button>
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Memuat event...</p>
         </div>
       </div>
     );
   }
 
-  const isPastEvent = new Date(event.event_date) < new Date();
-  const price = event.is_free ? 0 : (event.price || 0);
-  const isFreeEvent = event.is_free || event.price === 0 || event.registration_fee === 0;
-  const isFull =
-    event.max_participants &&
-    participantCount >= event.max_participants;
+  if (error || !event) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Event Tidak Ditemukan</h1>
+          <p className="text-gray-600 mb-6">{error || 'Event yang Anda cari tidak ditemukan'}</p>
+          <Link
+            to="/events"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Kembali ke Daftar Event
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Simple Header */}
-      <header className="bg-white border-b border-gray-200 py-4 px-6">
-        <div className="max-w-7xl mx-auto">
+      {/* Header with Back Button */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <button
-            onClick={() => navigate('/events')}
-            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
-            ← Kembali
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">Kembali</span>
           </button>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Performers Grid (2 columns) */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
           <div className="lg:col-span-2">
-            {/* Event Image Banner */}
-            {event.image_url && (
-              <div 
-                className="bg-white rounded-lg border border-gray-200 mb-6 overflow-hidden"
-                style={{ aspectRatio: event.image_aspect_ratio?.replace(':', '/') || '16/9' }}
-              >
+            {/* Event Image/Poster */}
+            {(event.image_url || event.image) && (
+              <div className="w-full h-[300px] md:h-[400px] rounded-2xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 mb-6 shadow-lg relative">
                 <img
-                  src={`http://localhost:3000${event.image_url}`}
+                  src={event.image_url 
+                    ? `http://localhost:3000${event.image_url}` 
+                    : event.image 
+                    ? `http://localhost:3000${event.image}` 
+                    : ''}
                   alt={event.title}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    e.target.style.display = 'none';
+                    const parent = e.target.parentElement;
+                    parent.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100"><p class="text-gray-500 text-sm">Gambar tidak tersedia</p></div>';
+                  }}
+                  onLoad={(e) => {
+                    // Ensure image is visible when loaded
+                    e.target.style.display = 'block';
                   }}
                 />
               </div>
             )}
 
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Performers</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {performers.length > 0 ? (
-                  performers.map((performer) => (
-                    <div key={performer.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                      <div className="w-14 h-14 rounded-lg flex-shrink-0 shadow-md overflow-hidden">
-                        {performer.photo_url ? (
-                          <img
-                            src={`http://localhost:3000${performer.photo_url}`}
-                            alt={performer.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.nextSibling.style.display = 'flex';
-                            }}
-                          />
-                        ) : null}
-                        <div className={`w-full h-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center ${performer.photo_url ? 'hidden' : 'flex'}`}>
-                          <span className="text-white text-2xl">🎭</span>
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 text-sm truncate">{performer.name}</p>
-                      </div>
+            {/* Title */}
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+              {event.title}
+            </h1>
+
+            {/* Category Badge */}
+            {event.category_name && (
+              <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full mb-4">
+                <Tag className="w-3.5 h-3.5" />
+                <span className="font-medium text-sm">{event.category_name}</span>
+              </div>
+            )}
+
+            {/* Event Details */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Detail Event</h2>
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <Calendar className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-gray-900">Tanggal Event</p>
+                    <p className="text-gray-600">{formatDate(event.event_date)}</p>
+                    {event.event_time && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        <Clock className="w-4 h-4 inline mr-1" />
+                        {formatTime(event.event_date)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {event.location && (
+                  <div className="flex items-start gap-4">
+                    <MapPin className="w-5 h-5 text-red-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-gray-900">Lokasi</p>
+                      <p className="text-gray-600">{event.location}</p>
+                      {event.address && (
+                        <p className="text-sm text-gray-500 mt-1">{event.address}</p>
+                      )}
+                      {(event.city || event.province) && (
+                        <p className="text-sm text-gray-500">
+                          {event.city}{event.city && event.province ? ', ' : ''}{event.province}
+                        </p>
+                      )}
                     </div>
-                  ))
-                ) : (
-                  <div className="col-span-2 text-center py-8 text-gray-500">
-                    <p className="text-sm">Lineup belum tersedia</p>
                   </div>
                 )}
+
+                {event.max_participants && (
+                  <div className="flex items-start gap-4">
+                    <Users className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-gray-900">Kapasitas</p>
+                      <p className="text-gray-600">
+                        {event.unlimited_participants 
+                          ? 'Tidak Terbatas' 
+                          : `${event.approved_registrations || 0} / ${event.max_participants} peserta`}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-4">
+                  <DollarSign className="w-5 h-5 text-purple-600 mt-1 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-gray-900">Biaya Pendaftaran</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatPrice(event.price, event.is_free)}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Short Description */}
+            {event.short_description && (
+              <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 mb-4">
+                <p className="text-gray-700 leading-relaxed text-sm">{event.short_description}</p>
+              </div>
+            )}
+
+            {/* Description */}
+            {event.description && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-4">
+                <h2 className="text-xl font-bold text-gray-900 mb-3">Tentang Event</h2>
+                <div 
+                  className="prose prose-sm max-w-none text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: event.description }}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Right: Event Details Card */}
+          {/* Sidebar - Registration Card */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border border-gray-200 p-6 sticky top-6 shadow-sm">
-              {/* Event Title */}
-              <h1 className="text-xl font-bold text-gray-900 mb-6 leading-tight">
-                {event.title}
-              </h1>
-
-              {/* Date */}
-              <div className="flex items-start gap-3 mb-4">
-                <Calendar className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-gray-900 font-medium">{formatDate(event.event_date)}</p>
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-5 sticky top-20">
+              <div className="text-center mb-5">
+                <div className="text-3xl font-bold text-gray-900 mb-1">
+                  {formatPrice(event.price, event.is_free)}
                 </div>
-              </div>
-
-              {/* Time */}
-              <div className="flex items-start gap-3 mb-4">
-                <Clock className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-gray-900 font-medium">{event.event_time} WIB</p>
-                </div>
-              </div>
-
-              {/* Location */}
-              <div className="flex items-start gap-3 mb-2">
-                <MapPin className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-gray-900 font-medium leading-snug">{event.location}</p>
-                </div>
-              </div>
-
-              {/* Petunjuk Arah Link */}
-              <div className="ml-8 mb-6">
-                <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(event.location)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-700 text-sm font-medium inline-flex items-center gap-1"
-                >
-                  Petunjuk Arah
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-
-              {/* Organizer */}
-              <div className="mb-6 pb-6 border-b border-gray-200">
-                <p className="text-sm text-gray-600 mb-1">Dibuat Oleh</p>
-                <p className="text-gray-900 font-medium">
-                  {event.organizer || 'Event Yukk Team'}
-                </p>
-              </div>
-
-              {/* Price */}
-              <div className="mb-6">
-                <p className="text-sm text-gray-600 mb-1">Mulai Dari</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {event.is_free ? 'Gratis' : formatPrice(price)}
-                </p>
-                {event.max_participants ? (
-                  <p className="text-sm text-gray-600 mt-2">
-                    Kuota peserta: {participantCount} / {event.max_participants}
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-600 mt-2">Total peserta: {participantCount}</p>
+                {!event.is_free && event.price > 0 && (
+                  <p className="text-xs text-gray-500">per peserta</p>
                 )}
               </div>
 
-              {/* CTA Button */}
-              {isPastEvent ? (
-                <button
-                  disabled
-                  className="w-full bg-gray-300 text-gray-600 font-semibold py-3 px-6 rounded-lg cursor-not-allowed"
-                >
-                  Event Telah Berakhir
-                </button>
-              ) : !isAuthenticated ? (
-                <button
-                  onClick={() => navigate('/login')}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
-                >
-                  Login untuk Beli
-                </button>
-              ) : (
-                <button
-                  onClick={handleRegister}
-                  disabled={registering || isRegistered || isFull || checkingRegistration}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {checkingRegistration
-                    ? 'Memeriksa...'
-                    : registering
-                    ? 'Memproses...'
-                    : isRegistered
-                    ? 'Sudah Terdaftar'
-                    : isFull
-                    ? 'Kuota Penuh'
-                    : 'Beli Sekarang'}
-                </button>
-              )}
+              <button
+                onClick={handleRegister}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-xl transition-all transform hover:scale-105 shadow-lg mb-4 text-sm"
+              >
+                {isAuthenticated ? 'Daftar Sekarang' : 'Login untuk Daftar'}
+              </button>
 
-              {(isRegistered || isFull) && (
-                <p className="mt-3 text-sm text-gray-600 text-center">
-                  {isFull
-                    ? 'Maaf, kuota peserta sudah terpenuhi.'
-                    : 'Anda sudah terdaftar pada event ini. Cek email Anda untuk detail selanjutnya.'}
-                </p>
-              )}
-
-              {/* Media Sosial */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <p className="text-sm font-semibold text-gray-900 mb-3">Media Sosial</p>
-                <div className="flex gap-3">
-                  <a
-                    href="#"
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <Instagram className="w-4 h-4 text-pink-600" />
-                    <span className="text-sm text-gray-700">Instagram</span>
-                  </a>
-                  <a
-                    href="#"
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/>
-                    </svg>
-                    <span className="text-sm text-gray-700">TikTok</span>
-                  </a>
+              {event.registration_deadline && (
+                <div className="text-center text-xs text-gray-500 mb-4 pb-4 border-b border-gray-200">
+                  <p className="mb-1">Pendaftaran ditutup:</p>
+                  <p className="font-semibold text-gray-700 text-sm">
+                    {formatDate(event.registration_deadline)}
+                  </p>
                 </div>
-                <a
-                  href="#"
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors mt-3"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                  </svg>
-                  <span className="text-sm text-gray-700">X</span>
-                </a>
+              )}
+
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <span>Konfirmasi instan</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <span>E-ticket via email</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <span>Pembatalan mudah</span>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Description Section Below */}
-        <div className="mt-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Deskripsi</h2>
-            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {event.description}
-            </p>
           </div>
         </div>
       </div>
@@ -556,3 +290,4 @@ const EventDetailModern = () => {
 };
 
 export default EventDetailModern;
+

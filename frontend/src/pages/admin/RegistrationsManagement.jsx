@@ -32,7 +32,13 @@ const RegistrationsManagement = () => {
       if (filters.status) params.status = filters.status;
       
       const response = await registrationsAPI.getAll(params);
-      setRegistrations(response.data.registrations || []);
+      // Handle different response structures
+      const registrationsData = response?.data?.registrations || 
+                                response?.data?.data?.registrations ||
+                                response?.registrations ||
+                                response?.data ||
+                                [];
+      setRegistrations(Array.isArray(registrationsData) ? registrationsData : []);
     } catch (error) {
       console.error('Error fetching registrations:', error);
     } finally {
@@ -329,9 +335,15 @@ const RegistrationsManagement = () => {
                           </span>
                         </div>
                         <div>
-                          <div className="text-black font-medium">{registration.user_name || registration.full_name}</div>
-                          <div className="text-gray-600 text-sm">{registration.email}</div>
-                          <div className="text-gray-600 text-sm">{registration.phone}</div>
+                          <div className="text-black font-medium">
+                            {registration.full_name || registration.user_name || 'Peserta'}
+                          </div>
+                          <div className="text-gray-600 text-sm">
+                            {registration.email || registration.user_email || '-'}
+                          </div>
+                          <div className="text-gray-600 text-sm">
+                            {registration.phone || registration.user_phone || '-'}
+                          </div>
                           {registration.institution && (
                             <div className="text-xs text-gray-500 mt-1">{registration.institution}</div>
                           )}
@@ -342,6 +354,9 @@ const RegistrationsManagement = () => {
                           )}
                           {registration.address && (
                             <div className="text-xs text-gray-400 mt-1">{registration.address}</div>
+                          )}
+                          {registration.notes && (
+                            <div className="text-xs text-gray-500 mt-1 italic">Catatan: {registration.notes}</div>
                           )}
                         </div>
                       </div>

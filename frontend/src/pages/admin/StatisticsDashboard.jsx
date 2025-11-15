@@ -5,6 +5,7 @@ import BarChart from '../../components/charts/BarChart';
 
 const StatisticsDashboard = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [statistics, setStatistics] = useState({
     monthlyEvents: [],
@@ -19,6 +20,7 @@ const StatisticsDashboard = () => {
   const fetchStatistics = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       const [monthlyEventsRes, monthlyParticipantsRes, topEventsRes] = await Promise.all([
         analyticsAPI.getMonthlyEvents({ year: selectedYear }),
@@ -26,40 +28,43 @@ const StatisticsDashboard = () => {
         analyticsAPI.getTopEvents()
       ]);
 
+      // Response interceptor returns response.data which is { success, message, data }
+      // So we need to access .data.monthlyEvents
       setStatistics({
-        monthlyEvents: monthlyEventsRes.data.monthlyEvents || [],
-        monthlyParticipants: monthlyParticipantsRes.data.monthlyParticipants || [],
-        topEvents: topEventsRes.data.topEvents || []
+        monthlyEvents: monthlyEventsRes?.data?.monthlyEvents || [],
+        monthlyParticipants: monthlyParticipantsRes?.data?.monthlyParticipants || [],
+        topEvents: topEventsRes?.data?.topEvents || []
       });
     } catch (error) {
       console.error('Error fetching statistics:', error);
+      setError(error?.message || 'Gagal memuat data statistik. Silakan coba lagi.');
     } finally {
       setLoading(false);
     }
   };
 
   // Prepare data for charts
-  const monthlyEventsData = statistics.monthlyEvents.map(item => ({
-    label: item.month_name.substring(0, 3), // Short month names
-    value: item.total_events
+  const monthlyEventsData = (statistics.monthlyEvents || []).map(item => ({
+    label: item.month_name?.substring(0, 3) || 'N/A', // Short month names
+    value: item.total_events || 0
   }));
 
-  const monthlyParticipantsData = statistics.monthlyParticipants.map(item => ({
-    label: item.month_name.substring(0, 3),
-    value: item.total_participants
+  const monthlyParticipantsData = (statistics.monthlyParticipants || []).map(item => ({
+    label: item.month_name?.substring(0, 3) || 'N/A',
+    value: item.total_participants || 0
   }));
 
-  const topEventsData = statistics.topEvents.map(item => ({
-    label: item.title.length > 15 ? item.title.substring(0, 15) + '...' : item.title,
-    value: item.participant_count,
-    fullTitle: item.title,
-    category: item.category_name,
-    date: new Date(item.event_date).toLocaleDateString('id-ID')
+  const topEventsData = (statistics.topEvents || []).map(item => ({
+    label: item.title?.length > 15 ? item.title.substring(0, 15) + '...' : (item.title || 'N/A'),
+    value: item.participant_count || 0,
+    fullTitle: item.title || 'N/A',
+    category: item.category_name || 'Uncategorized',
+    date: item.event_date ? new Date(item.event_date).toLocaleDateString('id-ID') : 'N/A'
   }));
 
   // Calculate summary statistics
-  const totalEvents = statistics.monthlyEvents.reduce((sum, item) => sum + item.total_events, 0);
-  const totalParticipants = statistics.monthlyParticipants.reduce((sum, item) => sum + item.total_participants, 0);
+  const totalEvents = (statistics.monthlyEvents || []).reduce((sum, item) => sum + (item.total_events || 0), 0);
+  const totalParticipants = (statistics.monthlyParticipants || []).reduce((sum, item) => sum + (item.total_participants || 0), 0);
   const avgParticipantsPerEvent = totalEvents > 0 ? Math.round(totalParticipants / totalEvents) : 0;
 
   const StatCard = ({ title, value, icon, color, subtitle }) => (
@@ -85,6 +90,24 @@ const StatisticsDashboard = () => {
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-black text-xl">Loading statistics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Memuat Data</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={fetchStatistics}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all"
+          >
+            Coba Lagi
+          </button>
         </div>
       </div>
     );

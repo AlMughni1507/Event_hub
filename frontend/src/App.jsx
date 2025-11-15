@@ -20,6 +20,7 @@ import SettingsPage from './pages/settings/profile';
 import AttendancePage from './pages/attendance/AttendancePage';
 import ReviewsPage from './pages/reviews/ReviewsPage';
 import MyEvents from './pages/user/MyEvents';
+import RegistrationFormPage from './pages/events/RegistrationFormPage';
 import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
 import PaymentPendingPage from './pages/payment/PaymentPendingPage';
 import PaymentErrorPage from './pages/payment/PaymentErrorPage';
@@ -121,6 +122,7 @@ const AnimatedRoutes = () => {
           <Route path="/my-events" element={<PageTransition><MyEvents /></PageTransition>} />
           <Route path="/reviews" element={<PageTransition><ReviewsPage /></PageTransition>} />
           <Route path="/attendance/:eventId" element={<PageTransition><AttendancePage /></PageTransition>} />
+          <Route path="/register-event/:eventId" element={<PageTransition><RegistrationFormPage /></PageTransition>} />
           <Route path="/payment/success" element={<PageTransition><PaymentSuccessPage /></PageTransition>} />
           <Route path="/payment/pending" element={<PageTransition><PaymentPendingPage /></PageTransition>} />
           <Route path="/payment/error" element={<PageTransition><PaymentErrorPage /></PageTransition>} />

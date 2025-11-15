@@ -282,14 +282,32 @@ router.get('/registrations', async (req, res) => {
     );
 
     // Get registrations with event and user info
+    // Try to use columns from event_registrations first, fallback to users/registrations tables
     const [registrations] = await query(
-      `SELECT r.*, e.title as event_title, e.event_date, e.location,
-              u.full_name as user_name, u.email as user_email
+      `SELECT r.*, 
+              e.title as event_title, 
+              e.event_date, 
+              e.location,
+              e.price as event_price,
+              e.is_free,
+              u.full_name as user_name, 
+              u.email as user_email,
+              u.phone as user_phone,
+              -- Use event_registrations columns if they exist, otherwise use registrations table, then users
+              COALESCE(r.full_name, reg.full_name, u.full_name) as full_name,
+              COALESCE(r.email, reg.email, u.email) as email,
+              COALESCE(r.phone, reg.phone, u.phone) as phone,
+              COALESCE(r.address, reg.address) as address,
+              COALESCE(r.city, reg.city) as city,
+              COALESCE(r.province, reg.province) as province,
+              COALESCE(r.institution, reg.institution) as institution,
+              COALESCE(r.notes, reg.notes) as notes
        FROM event_registrations r
        LEFT JOIN events e ON r.event_id = e.id
        LEFT JOIN users u ON r.user_id = u.id
+       LEFT JOIN registrations reg ON r.user_id = reg.user_id AND r.event_id = reg.event_id
        ${whereClause}
-       ORDER BY r.created_at DESC 
+       ORDER BY COALESCE(r.created_at, r.id) DESC 
        LIMIT ? OFFSET ?`,
       [...params, parseInt(limit), offset]
     );
@@ -308,7 +326,9 @@ router.get('/registrations', async (req, res) => {
 
   } catch (error) {
     console.error('Get registrations error:', error);
-    return ApiResponse.error(res, 'Failed to get registrations');
+    console.error('Error details:', error.message);
+    console.error('SQL State:', error.sqlState);
+    return ApiResponse.error(res, `Failed to get registrations: ${error.message}`);
   }
 });
 
@@ -520,33 +540,47 @@ router.get('/export/participants/:eventId', async (req, res) => {
       return ApiResponse.notFound(res, 'Event not found');
     }
 
-    // Get participants data
+    // Get participants data from event_registrations (main table with all data)
     const [participants] = await query(`
       SELECT 
         er.id,
-        COALESCE(u.full_name) as full_name,
-        COALESCE(u.email) as email,
-        COALESCE(u.phone) as phone,
+        er.user_id,
+        COALESCE(er.full_name, u.full_name) as full_name,
+        COALESCE(er.email, u.email) as email,
+        COALESCE(er.phone, u.phone) as phone,
+        er.address,
+        er.city,
+        er.province,
+        er.institution,
+        er.notes,
         er.status,
-        er.registration_date,
         er.payment_status,
+        er.payment_amount,
+        er.attendance_status,
         er.created_at
-      FROM registrations er
+      FROM event_registrations er
       LEFT JOIN users u ON er.user_id = u.id
       WHERE er.event_id = ?
       ORDER BY er.created_at DESC
     `, [eventId]);
 
-    // Prepare data for export
+    // Prepare data for export with all registration data
     const exportData = participants.map((participant, index) => ({
       'No': index + 1,
-      'Nama Lengkap': participant.full_name,
-      'Email': participant.email,
-      'No. Telepon': participant.phone,
-      'Status Pendaftaran': participant.status,
+      'Nama Lengkap': participant.full_name || '-',
+      'Email': participant.email || '-',
+      'No. Telepon': participant.phone || '-',
+      'Alamat': participant.address || '-',
+      'Kota': participant.city || '-',
+      'Provinsi': participant.province || '-',
+      'Institusi': participant.institution || '-',
+      'Catatan': participant.notes || '-',
+      'Status Pendaftaran': participant.status || 'pending',
       'Status Pembayaran': participant.payment_status || 'Belum Dibayar',
-      'Tanggal Daftar': new Date(participant.created_at).toLocaleDateString('id-ID'),
-      'Waktu Daftar': new Date(participant.created_at).toLocaleTimeString('id-ID')
+      'Jumlah Bayar': participant.payment_amount ? `Rp ${parseFloat(participant.payment_amount).toLocaleString('id-ID')}` : 'Gratis',
+      'Status Kehadiran': participant.attendance_status || 'not_attended',
+      'Tanggal Daftar': participant.created_at ? new Date(participant.created_at).toLocaleDateString('id-ID') : '-',
+      'Waktu Daftar': participant.created_at ? new Date(participant.created_at).toLocaleTimeString('id-ID') : '-'
     }));
 
     if (format === 'csv') {

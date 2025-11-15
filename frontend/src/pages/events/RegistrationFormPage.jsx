@@ -43,14 +43,20 @@ const RegistrationFormPage = () => {
     try {
       setLoading(true);
       const response = await api.get(`/events/${eventId}`);
-      setEvent(response.data.event || response.data);
+      const eventData = response?.data?.event || response?.data || response;
+      setEvent(eventData);
       
-      // Pre-fill nama dan email dari user profile
+      // Pre-fill data dari user profile
       if (user) {
         setFormData(prev => ({
           ...prev,
-          full_name: user.full_name || '',
-          email: user.email || ''
+          full_name: user.full_name || user.username || '',
+          email: user.email || '',
+          phone: user.phone || user.phone_number || '',
+          address: user.address || '',
+          city: user.city || '',
+          province: user.province || '',
+          institution: user.institution || ''
         }));
       }
     } catch (error) {
@@ -122,7 +128,9 @@ const RegistrationFormPage = () => {
 
     setSubmitting(true);
     try {
-      // Submit registration dengan data diri
+      const isFreeEvent = event?.is_free || event?.price === 0;
+      
+      // Submit registration dengan data diri lengkap
       const response = await api.post('/registrations', {
         event_id: parseInt(eventId),
         full_name: formData.full_name,
@@ -133,36 +141,115 @@ const RegistrationFormPage = () => {
         province: formData.province,
         institution: formData.institution,
         notes: formData.notes,
-        payment_method: 'free'
+        payment_method: isFreeEvent ? 'free' : 'cash'
       });
 
-      if (response?.success) {
-        setRegistered(true);
-        const token = response.data?.token || null;
-        setTokenInfo({
-          token,
-          email: formData.email,
-          expiresAt: response.data?.tokenExpiresAt || null,
-        });
+      const responseData = response?.data || response;
+      const success = responseData?.success !== false;
 
-        toast.success(
-          token
-            ? 'Pendaftaran berhasil! Token kehadiran ada di bawah dan juga dikirim ke email Anda.'
-            : 'Pendaftaran berhasil! Token akan dikirim setelah konfirmasi panitia.'
-        );
+      if (success) {
+        if (isFreeEvent) {
+          // Free event - registration confirmed immediately
+          setRegistered(true);
+          const token = responseData?.data?.token || responseData?.token || null;
+          setTokenInfo({
+            token,
+            email: formData.email,
+            expiresAt: responseData?.data?.tokenExpiresAt || responseData?.tokenExpiresAt || null,
+          });
 
-        setTimeout(() => {
-          navigate('/settings');
-        }, 2500);
+          toast.success('✅ Pendaftaran berhasil! Token kehadiran telah dikirim ke email Anda.');
+          
+          setTimeout(() => {
+            navigate('/settings');
+          }, 3000);
+        } else {
+          // Paid event - redirect to payment
+          const registrationData = responseData?.data || responseData;
+          const registrationId = registrationData?.id;
+          
+          if (registrationId) {
+            // Create payment transaction
+            try {
+              const paymentResponse = await api.post('/payments/create-transaction', {
+                event_id: parseInt(eventId),
+                registration_id: registrationId
+              });
+              
+              const paymentData = paymentResponse?.data || paymentResponse;
+              
+              if (paymentData?.token && paymentData?.client_key) {
+                // Load Midtrans Snap.js dynamically
+                const loadSnapAndPay = () => {
+                  if (window.snap) {
+                    window.snap.pay(paymentData.token, {
+                      onSuccess: function(result) {
+                        console.log('Payment success:', result);
+                        navigate(`/payment/success?order_id=${result.order_id}`);
+                      },
+                      onPending: function(result) {
+                        console.log('Payment pending:', result);
+                        navigate(`/payment/pending?order_id=${result.order_id}`);
+                      },
+                      onError: function(result) {
+                        console.log('Payment error:', result);
+                        navigate(`/payment/error?order_id=${result.order_id}`);
+                      },
+                      onClose: function() {
+                        console.log('Payment popup closed');
+                        alert('Pembayaran dibatalkan. Anda dapat mencoba lagi nanti.');
+                      }
+                    });
+                  } else {
+                    console.error('Midtrans Snap.js not loaded');
+                    alert('Gagal memuat payment gateway. Silakan refresh halaman dan coba lagi.');
+                  }
+                };
+
+                if (!window.snap) {
+                  const script = document.createElement('script');
+                  script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
+                  script.setAttribute('data-client-key', paymentData.client_key);
+                  script.onload = loadSnapAndPay;
+                  script.onerror = () => {
+                    alert('Gagal memuat payment gateway. Silakan coba lagi.');
+                  };
+                  document.head.appendChild(script);
+                } else {
+                  loadSnapAndPay();
+                }
+              } else {
+                throw new Error('Failed to get payment token');
+              }
+            } catch (paymentError) {
+              console.error('Payment error:', paymentError);
+              toast.error('Registrasi berhasil, tetapi gagal membuat transaksi pembayaran. Silakan hubungi admin.');
+              navigate('/settings');
+            }
+          } else {
+            toast.success('Registrasi berhasil! Silakan selesaikan pembayaran.');
+            navigate('/settings');
+          }
+        }
       } else {
-        toast.error(response?.message || 'Gagal melakukan registrasi');
+        throw new Error(responseData?.message || 'Gagal melakukan registrasi');
       }
     } catch (error) {
       console.error('Registration error:', error);
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error ||
-                          error.message ||
-                          'Gagal melakukan registrasi';
+      const errorData = error.response?.data || error;
+      let errorMessage = 'Gagal melakukan registrasi. Silakan coba lagi.';
+      
+      if (errorData) {
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors.map(e => `${e.field}: ${e.message}`).join('\n');
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
       
       // Check if already registered
       if (error.response?.status === 409) {
@@ -276,11 +363,16 @@ const RegistrationFormPage = () => {
             <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Detail Event</h3>
               
-              {event.image_url && (
+              {(event.image_url || event.image) && (
                 <img 
-                  src={event.image_url} 
+                  src={event.image_url?.startsWith('http') 
+                    ? event.image_url 
+                    : `http://localhost:3000${event.image_url || event.image}`} 
                   alt={event.title}
                   className="w-full h-40 object-cover rounded-lg mb-4"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
                 />
               )}
 
@@ -313,8 +405,12 @@ const RegistrationFormPage = () => {
                 </div>
 
                 <div className="pt-4 border-t border-gray-200">
-                  <p className="text-sm font-medium text-gray-600">Status</p>
-                  <p className="text-lg font-bold text-green-600">GRATIS</p>
+                  <p className="text-sm font-medium text-gray-600">Harga</p>
+                  <p className="text-lg font-bold text-green-600">
+                    {event.is_free || event.price === 0 
+                      ? 'GRATIS' 
+                      : `Rp ${parseFloat(event.price || 0).toLocaleString('id-ID')}`}
+                  </p>
                 </div>
               </div>
             </div>

@@ -128,7 +128,37 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
 
     // Check if event registration is still open (event hasn't started yet)
     const now = new Date();
-    const eventDateTime = new Date(`${event.event_date} ${event.event_time}`);
+    
+    // Safely parse event date and time
+    let eventDateTime;
+    try {
+      const eventDateStr = event.event_date ? event.event_date.toString().split('T')[0] : null;
+      const eventTimeStr = event.event_time ? event.event_time.toString() : '00:00:00';
+      
+      if (!eventDateStr) {
+        return ApiResponse.badRequest(res, 'Event date is required');
+      }
+      
+      // Parse date and time safely
+      const [year, month, day] = eventDateStr.split('-');
+      const [hours, minutes, seconds] = eventTimeStr.split(':');
+      
+      eventDateTime = new Date(
+        parseInt(year),
+        parseInt(month) - 1, // Month is 0-indexed
+        parseInt(day),
+        parseInt(hours || 0),
+        parseInt(minutes || 0),
+        parseInt(seconds || 0)
+      );
+      
+      if (isNaN(eventDateTime.getTime())) {
+        throw new Error('Invalid date format');
+      }
+    } catch (dateError) {
+      console.error('❌ Error parsing event date/time:', dateError);
+      return ApiResponse.badRequest(res, 'Invalid event date or time format');
+    }
     
     console.log('🕐 Current time:', now.toISOString());
     console.log('🕐 Event time:', eventDateTime.toISOString());
@@ -193,10 +223,70 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     const paymentAmount = parseFloat(event.price || 0);
 
     // Calculate attendance deadline (end of event day + 1 hour buffer)
-    const eventEndTime = event.end_time || '23:59:59';
-    const eventEndDate = event.end_date || event.event_date;
-    const attendanceDeadline = new Date(`${eventEndDate} ${eventEndTime}`);
-    attendanceDeadline.setHours(attendanceDeadline.getHours() + 1); // 1 hour after event ends
+    let attendanceDeadline;
+    try {
+      const eventEndDateStr = (event.end_date || event.event_date) ? (event.end_date || event.event_date).toString().split('T')[0] : null;
+      const eventEndTimeStr = (event.end_time || '23:59:59').toString();
+      
+      if (!eventEndDateStr) {
+        // Use event start date if end date is not available
+        const eventDateStr = event.event_date ? event.event_date.toString().split('T')[0] : null;
+        if (!eventDateStr) {
+          throw new Error('Event date is required');
+        }
+        
+        const [year, month, day] = eventDateStr.split('-');
+        const [hours, minutes, seconds] = eventEndTimeStr.split(':');
+        
+        attendanceDeadline = new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hours || 23),
+          parseInt(minutes || 59),
+          parseInt(seconds || 59)
+        );
+      } else {
+        const [year, month, day] = eventEndDateStr.split('-');
+        const [hours, minutes, seconds] = eventEndTimeStr.split(':');
+        
+        attendanceDeadline = new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hours || 23),
+          parseInt(minutes || 59),
+          parseInt(seconds || 59)
+        );
+      }
+      
+      if (isNaN(attendanceDeadline.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+      // Add 1 hour after event ends
+      attendanceDeadline.setHours(attendanceDeadline.getHours() + 1);
+      
+      // Validate the date is valid
+      if (isNaN(attendanceDeadline.getTime())) {
+        throw new Error('Invalid attendance deadline date');
+      }
+    } catch (dateError) {
+      console.error('❌ Error calculating attendance deadline:', dateError);
+      // Fallback: use event date + 1 day
+      const eventDateStr = event.event_date ? event.event_date.toString().split('T')[0] : null;
+      if (eventDateStr) {
+        const [year, month, day] = eventDateStr.split('-');
+        attendanceDeadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day) + 1);
+      } else {
+        attendanceDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day from now
+      }
+      console.warn('⚠️ Using fallback attendance deadline:', attendanceDeadline);
+    }
+    
+    // Format attendanceDeadline for MySQL (YYYY-MM-DD HH:mm:ss)
+    const attendanceDeadlineFormatted = attendanceDeadline.toISOString().slice(0, 19).replace('T', ' ');
+    console.log('📅 Attendance deadline:', attendanceDeadlineFormatted);
 
     // Save to primary registrations table (analytics & user profile)
     let primaryRegistrationId = null;
@@ -219,7 +309,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
           registrationStatus,
           paymentStatus,
           paymentAmount,
-          attendanceDeadline,
+          attendanceDeadlineFormatted,
           notes || ''
         ]
       );
@@ -231,31 +321,66 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     }
 
     // Create event registration (main reference for attendance & admin screens)
-    const [eventInsert] = await query(
-      `INSERT INTO event_registrations
-       (user_id, event_id, full_name, phone, email, address, city, province, institution, payment_method, payment_amount, payment_status, status, attendance_required, attendance_status, attendance_deadline, notes) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, 'pending', ?, ?)`,
-      [
-        req.user.id,
-        event_id,
-        registrantName,
-        registrantPhone,
-        registrantEmail,
-        registrantAddress,
-        registrantCity,
-        registrantProvince,
-        registrantInstitution,
-        payment_method,
-        paymentAmount,
-        paymentStatus,
-        registrationStatus,
-        attendanceDeadline,
-        notes || ''
-      ]
-    );
-
-    const eventRegistrationId = eventInsert.insertId;
-    console.log('✅ Event registration created:', eventRegistrationId);
+    // Try to insert with all fields first, if fails try with minimal fields
+    let eventInsert;
+    let eventRegistrationId;
+    
+    try {
+      // Try inserting with all fields (if migration 033 has been run)
+      [eventInsert] = await query(
+        `INSERT INTO event_registrations
+         (user_id, event_id, full_name, phone, email, address, city, province, institution, payment_method, payment_amount, payment_status, status, attendance_required, attendance_status, attendance_deadline, notes) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, 'pending', ?, ?)`,
+        [
+          req.user.id,
+          event_id,
+          registrantName,
+          registrantPhone,
+          registrantEmail,
+          registrantAddress,
+          registrantCity,
+          registrantProvince,
+          registrantInstitution,
+          payment_method,
+          paymentAmount,
+          paymentStatus,
+          registrationStatus,
+          attendanceDeadlineFormatted,
+          notes || ''
+        ]
+      );
+      eventRegistrationId = eventInsert.insertId;
+      console.log('✅ Event registration created with all fields:', eventRegistrationId);
+    } catch (insertError) {
+      // If error is about missing columns, try with minimal fields
+      if (insertError.code === 'ER_BAD_FIELD_ERROR' || insertError.message.includes('Unknown column')) {
+        console.warn('⚠️ Full fields not available, trying minimal fields...');
+        try {
+          // Insert with only basic fields that should exist (without attendance columns)
+          [eventInsert] = await query(
+            `INSERT INTO event_registrations
+             (user_id, event_id, payment_method, payment_amount, payment_status, status) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              req.user.id,
+              event_id,
+              payment_method,
+              paymentAmount,
+              paymentStatus,
+              registrationStatus
+            ]
+          );
+          eventRegistrationId = eventInsert.insertId;
+          console.log('✅ Event registration created with minimal fields:', eventRegistrationId);
+        } catch (minimalError) {
+          console.error('❌ Failed to insert with minimal fields:', minimalError);
+          throw minimalError;
+        }
+      } else {
+        // If it's a different error, throw it
+        throw insertError;
+      }
+    }
 
     let tokenData = null;
 
@@ -311,14 +436,18 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     console.error('❌ Create registration error:', error);
     console.error('❌ Error stack:', error.stack);
     console.error('❌ Error message:', error.message);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ SQL State:', error.sqlState);
     
     // Provide more specific error message
     let errorMessage = 'Failed to create registration';
-    if (error.message) {
+    if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Database schema error. Please run migrations.';
+    } else if (error.message) {
       errorMessage = error.message;
     }
     
-    return ApiResponse.error(res, errorMessage, error.message);
+    return ApiResponse.error(res, errorMessage);
   }
 });
 

@@ -64,13 +64,20 @@ const EventsPage = () => {
       // Fetch events first
       console.log('📡 Fetching events...');
       const eventsResponse = await eventsAPI.getAll({ 
-        limit: 50, 
+        limit: 100, 
+        page: 1,
         search: searchTerm,
         category_id: selectedCategory !== 'all' ? selectedCategory : '',
         sort_by: sortBy,
         upcoming: timeFilter === 'upcoming' ? 'true' : ''
       });
       console.log('📡 Events response:', eventsResponse);
+      console.log('📡 Events response structure:', {
+        hasData: !!eventsResponse?.data,
+        hasEvents: !!eventsResponse?.data?.events,
+        isArray: Array.isArray(eventsResponse),
+        keys: Object.keys(eventsResponse || {})
+      });
       
       // Use simplified categories from database with Lucide icons
       const allCategories = [
@@ -85,14 +92,32 @@ const EventsPage = () => {
       
       setCategories(allCategories);
       
-      // Get events from response
-      const events = eventsResponse?.data?.events || eventsResponse?.events || [];
+      // Get events from response - handle different response structures
+      let events = [];
+      if (eventsResponse?.data) {
+        // Response structure: { data: { events: [...], pagination: {...} } }
+        events = eventsResponse.data.events || eventsResponse.data.data?.events || [];
+      } else if (eventsResponse?.events) {
+        // Response structure: { events: [...] }
+        events = eventsResponse.events;
+      } else if (Array.isArray(eventsResponse)) {
+        // Response is directly an array
+        events = eventsResponse;
+      }
+      
       console.log('📋 Raw events from API:', events);
+      console.log('📋 Events count:', events.length);
       console.log('📅 Current date:', new Date());
       
-      // Show all events for now (remove filter temporarily)
-      console.log('📋 All events (no filter):', events);
-      setEvents(events);
+      // Filter only active and published events
+      const activeEvents = events.filter(e => 
+        e.is_active !== false && 
+        e.status !== 'archived' && 
+        e.status !== 'draft'
+      );
+      
+      console.log('📋 Active events (filtered):', activeEvents.length);
+      setEvents(activeEvents);
       setIsLoaded(true);
       
     } catch (err) {

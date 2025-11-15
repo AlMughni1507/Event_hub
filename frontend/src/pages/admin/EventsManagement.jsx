@@ -208,12 +208,15 @@ const EventsManagement = () => {
         },
       });
 
-      const registrationsData =
-        response?.data?.registrations ||
-        response?.data?.data?.registrations ||
-        response?.registrations ||
-        response?.data ||
-        [];
+      // Handle different response structures
+      let registrationsData = [];
+      if (response?.data) {
+        registrationsData = response.data.registrations || response.data.data?.registrations || [];
+      } else if (response?.registrations) {
+        registrationsData = response.registrations;
+      } else if (Array.isArray(response)) {
+        registrationsData = response;
+      }
 
       setParticipantsModal((prev) => ({
         ...prev,

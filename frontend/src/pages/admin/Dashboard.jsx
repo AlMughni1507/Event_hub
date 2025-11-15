@@ -36,18 +36,45 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null); // Clear previous errors
       
-      // Fetch data with high limit to get accurate total counts from pagination
-      const [eventsRes, usersRes, registrationsRes, categoriesRes] = await Promise.all([
-        adminAPI.getAllEvents({ limit: 1000 }),
-        adminAPI.getAllUsers({ limit: 10000 }),
-        adminAPI.getAllRegistrations({ limit: 10000 }),
-        categoriesAPI.getAll()
-      ]);
+      // Fetch data with individual error handling for each API call
+      let eventsRes, usersRes, registrationsRes, categoriesRes;
+      let eventsError, usersError, registrationsError, categoriesError;
+      
+      try {
+        eventsRes = await adminAPI.getAllEvents({ limit: 1000 });
+      } catch (err) {
+        console.error('Error fetching events:', err);
+        eventsError = err.message;
+        eventsRes = { data: { events: [], pagination: { total: 0 } } };
+      }
+      
+      try {
+        usersRes = await adminAPI.getAllUsers({ limit: 10000 });
+      } catch (err) {
+        console.error('Error fetching users:', err);
+        usersError = err.message;
+        usersRes = { data: { users: [], pagination: { total: 0 } } };
+      }
+      
+      try {
+        registrationsRes = await adminAPI.getAllRegistrations({ limit: 10000 });
+      } catch (err) {
+        console.error('Error fetching registrations:', err);
+        registrationsError = err.message;
+        registrationsRes = { data: { registrations: [], pagination: { total: 0 } } };
+      }
+      
+      try {
+        categoriesRes = await categoriesAPI.getAll();
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        categoriesError = err.message;
+        categoriesRes = { data: { categories: [] } };
+      }
 
       // Extract data with proper null checks
-      // API response structure: { success, message, data: { events: [], pagination: { total: ... } } }
-      // API interceptor already returns response.data, so we need to handle both structures
       const eventsData = eventsRes?.data || eventsRes || {};
       const usersData = usersRes?.data || usersRes || {};
       const registrationsData = registrationsRes?.data || registrationsRes || {};
@@ -64,13 +91,6 @@ const Dashboard = () => {
       const totalRegistrations = registrationsData.pagination?.total || allRegistrations.length;
       const totalCategories = allCategories.length;
       
-      console.log('🔍 Raw API Responses:', {
-        eventsRes,
-        usersRes,
-        registrationsRes,
-        categoriesRes
-      });
-      
       // Calculate active events (published and upcoming)
       const activeEvents = allEvents.filter(e => 
         e.status === 'published' && 
@@ -83,14 +103,6 @@ const Dashboard = () => {
         new Date(b.created_at || b.event_date) - new Date(a.created_at || a.event_date)
       );
 
-      console.log('📊 Dashboard Stats:', {
-        totalEvents,
-        activeEvents: activeEvents.length,
-        totalUsers,
-        totalRegistrations,
-        totalCategories
-      });
-
       setStats({
         totalEvents,
         activeEvents: activeEvents.length,
@@ -100,9 +112,19 @@ const Dashboard = () => {
         recentEvents: sortedEvents.slice(0, 5),
         recentRegistrations: allRegistrations.slice(0, 5)
       });
+      
+      // Set error message only if there are critical errors
+      const errors = [eventsError, usersError, registrationsError, categoriesError].filter(Boolean);
+      if (errors.length > 0) {
+        // Only show warning for non-critical errors (like registrations)
+        if (registrationsError && !eventsError && !usersError) {
+          setError('Failed to get registrations');
+        } else if (errors.length > 0) {
+          setError(`Failed to load some data: ${errors.join(', ')}`);
+        }
+      }
     } catch (error) {
       console.error('❌ Error fetching dashboard data:', error);
-      console.error('Error details:', error.response?.data || error.message);
       setError(error.message || 'Failed to load dashboard data');
       // Set default values on error to prevent blank page
       setStats({
