@@ -106,12 +106,12 @@ const validateRegistration = [
     .withMessage('Full name must be between 2 and 150 characters'),
 
   body('email')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .isEmail()
     .withMessage('Please provide a valid email address'),
 
   body('phone')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .matches(/^[0-9+\-\s()]{8,20}$/)
     .withMessage('Phone number must be 8-20 digits and can contain +, -, spaces, and parentheses'),
 

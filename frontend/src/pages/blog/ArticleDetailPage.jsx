@@ -169,9 +169,12 @@ const ArticleDetailPage = () => {
         {article.featured_image && (
           <div className="mb-8">
             <img
-              src={article.featured_image}
+              src={article.featured_image.startsWith('http') ? article.featured_image : `http://localhost:3000${article.featured_image}`}
               alt={article.title}
               className="w-full h-64 md:h-96 object-cover rounded-2xl"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
             />
           </div>
         )}
@@ -252,9 +255,13 @@ const ArticleDetailPage = () => {
                   <div className="aspect-video bg-gradient-to-r from-cosmic-navy to-stellar-blue relative overflow-hidden">
                     {relatedArticle.featured_image ? (
                       <img 
-                        src={relatedArticle.featured_image} 
+                        src={relatedArticle.featured_image.startsWith('http') ? relatedArticle.featured_image : `http://localhost:3000${relatedArticle.featured_image}`}
                         alt={relatedArticle.title}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center"><span class="text-4xl">' + getCategoryIcon(relatedArticle.category) + '</span></div>';
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

@@ -218,9 +218,14 @@ const BlogPage = () => {
                   <div className="relative h-56 overflow-hidden">
                     {article.featured_image ? (
                       <img 
-                        src={article.featured_image} 
+                        src={article.featured_image.startsWith('http') ? article.featured_image : `http://localhost:3000${article.featured_image}`}
                         alt={article.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          const iconElement = getCategoryIcon(article.category);
+                          e.target.parentElement.innerHTML = '<div class="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">' + iconElement.props.children + '</div>';
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
@@ -291,9 +296,14 @@ const BlogPage = () => {
                   <div className="relative h-56 overflow-hidden">
                     {article.featured_image ? (
                       <img 
-                        src={article.featured_image} 
+                        src={article.featured_image.startsWith('http') ? article.featured_image : `http://localhost:3000${article.featured_image}`}
                         alt={article.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          const iconElement = getCategoryIcon(article.category);
+                          e.target.parentElement.innerHTML = '<div class="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">' + iconElement.props.children + '</div>';
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">

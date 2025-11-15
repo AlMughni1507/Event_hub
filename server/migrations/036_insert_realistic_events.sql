@@ -1,0 +1,403 @@
+-- Migration: Insert Realistic Events with Images and Prices
+-- Date: 2025-01-XX
+-- Description: Insert multiple realistic events with different prices, images, and complete details
+
+-- First, get admin user ID (assuming admin exists with id=1)
+SET @admin_id = (SELECT id FROM users WHERE role = 'admin' LIMIT 1);
+
+-- Get category IDs based on actual category names
+-- Categories: 1=Conference & Summit, 2=Workshop & Training, 3=Exhibition & Expo, 
+--             4=Education, 5=Food, 6=Art & Culture, 7=Health & Wellness
+SET @category_tech = (SELECT id FROM categories WHERE name = 'Conference & Summit' LIMIT 1);
+SET @category_workshop = (SELECT id FROM categories WHERE name = 'Workshop & Training' LIMIT 1);
+SET @category_expo = (SELECT id FROM categories WHERE name = 'Exhibition & Expo' LIMIT 1);
+SET @category_education = (SELECT id FROM categories WHERE name = 'Education' LIMIT 1);
+SET @category_food = (SELECT id FROM categories WHERE name = 'Food' LIMIT 1);
+SET @category_art = (SELECT id FROM categories WHERE name = 'Art & Culture' LIMIT 1);
+SET @category_health = (SELECT id FROM categories WHERE name = 'Health & Wellness' LIMIT 1);
+
+-- If categories don't exist, use default IDs (based on migration 015)
+SET @category_tech = IFNULL(@category_tech, 1);
+SET @category_workshop = IFNULL(@category_workshop, 2);
+SET @category_expo = IFNULL(@category_expo, 3);
+SET @category_education = IFNULL(@category_education, 4);
+SET @category_food = IFNULL(@category_food, 5);
+SET @category_art = IFNULL(@category_art, 6);
+SET @category_health = IFNULL(@category_health, 7);
+
+-- Insert realistic events with different prices and images
+INSERT INTO events (
+    title,
+    description,
+    short_description,
+    category_id,
+    organizer_id,
+    event_date,
+    event_time,
+    end_date,
+    end_time,
+    location,
+    address,
+    city,
+    province,
+    max_participants,
+    price,
+    currency,
+    is_free,
+    is_active,
+    status,
+    is_featured,
+    is_highlighted,
+    has_certificate,
+    image,
+    banner,
+    registration_deadline
+) VALUES
+-- Event 1: Tech Conference (High Price)
+(
+    'Indonesia Tech Summit 2025',
+    'Konferensi teknologi terbesar di Indonesia yang menghadirkan pembicara dari perusahaan teknologi global dan lokal. Topik meliputi Artificial Intelligence, Machine Learning, Cloud Computing, Cybersecurity, dan Blockchain. Acara ini cocok untuk developer, tech entrepreneur, dan profesional IT yang ingin update dengan tren teknologi terkini. Termasuk networking session, workshop hands-on, dan startup pitch competition.',
+    'Konferensi teknologi terbesar dengan pembicara dari perusahaan teknologi global dan lokal. Topik: AI, ML, Cloud, Cybersecurity.',
+    @category_tech,
+    @admin_id,
+    '2025-02-15',
+    '08:00:00',
+    '2025-02-15',
+    '18:00:00',
+    'Jakarta Convention Center',
+    'Jl. Gatot Subroto No. 1, Senayan, Jakarta Pusat',
+    'Jakarta',
+    'DKI Jakarta',
+    1000,
+    750000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    TRUE,
+    TRUE,
+    TRUE,
+    '/uploads/events/tech-summit-2025.jpg',
+    '/uploads/events/tech-summit-2025-banner.jpg',
+    '2025-02-10'
+),
+
+-- Event 2: Digital Marketing Workshop (Medium Price)
+(
+    'Digital Marketing Masterclass 2025',
+    'Workshop intensif selama 2 hari yang mengajarkan strategi digital marketing terbaru. Materi meliputi Social Media Marketing (Instagram, TikTok, Facebook), Search Engine Optimization (SEO), Google Ads, Content Marketing, Email Marketing, dan Analytics. Dibawakan oleh praktisi digital marketing dengan pengalaman lebih dari 10 tahun. Cocok untuk business owner, marketing manager, dan content creator.',
+    'Workshop intensif 2 hari tentang strategi digital marketing: SEO, Social Media, Google Ads, dan Content Marketing.',
+    @category_workshop,
+    @admin_id,
+    '2025-02-20',
+    '09:00:00',
+    '2025-02-21',
+    '17:00:00',
+    'Bandung Creative Hub',
+    'Jl. Layang-Layang No. 8, Bandung',
+    'Bandung',
+    'Jawa Barat',
+    150,
+    450000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    TRUE,
+    FALSE,
+    TRUE,
+    '/uploads/events/digital-marketing-workshop.jpg',
+    '/uploads/events/digital-marketing-workshop-banner.jpg',
+    '2025-02-15'
+),
+
+-- Event 3: Web Development Bootcamp (High Price)
+(
+    'Full Stack Web Development Bootcamp',
+    'Bootcamp intensif 5 hari untuk belajar full stack web development dari dasar hingga advanced. Teknologi yang dipelajari: HTML5, CSS3, JavaScript (ES6+), React.js, Node.js, Express.js, MongoDB, dan deployment. Setiap peserta akan membuat 3 project portfolio yang bisa digunakan untuk melamar kerja. Mentor berpengalaman dari perusahaan teknologi terkemuka. Cocok untuk fresh graduate, career switcher, dan developer yang ingin upgrade skill.',
+    'Bootcamp intensif 5 hari full stack web development: React, Node.js, MongoDB. Termasuk 3 project portfolio.',
+    @category_workshop,
+    @admin_id,
+    '2025-03-01',
+    '09:00:00',
+    '2025-03-05',
+    '17:00:00',
+    'Surabaya Tech Park',
+    'Jl. Raya ITS, Keputih, Surabaya',
+    'Surabaya',
+    'Jawa Timur',
+    50,
+    2500000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    TRUE,
+    TRUE,
+    TRUE,
+    '/uploads/events/web-dev-bootcamp.jpg',
+    '/uploads/events/web-dev-bootcamp-banner.jpg',
+    '2025-02-25'
+),
+
+-- Event 4: Food Festival (Low Price)
+(
+    'Jakarta Food Festival 2025',
+    'Festival kuliner terbesar di Jakarta yang menampilkan lebih dari 100 vendor makanan dan minuman dari seluruh Indonesia. Nikmati berbagai hidangan tradisional, modern fusion, street food, dan dessert. Ada juga cooking demo dari chef terkenal, food competition, dan live music. Cocok untuk foodie, keluarga, dan pecinta kuliner. Tiket termasuk welcome drink dan food voucher senilai Rp 50.000.',
+    'Festival kuliner terbesar dengan 100+ vendor makanan dari seluruh Indonesia. Termasuk cooking demo dan live music.',
+    @category_food,
+    @admin_id,
+    '2025-03-10',
+    '10:00:00',
+    '2025-03-10',
+    '22:00:00',
+    'Lapangan Monas',
+    'Jl. Medan Merdeka, Jakarta Pusat',
+    'Jakarta',
+    'DKI Jakarta',
+    5000,
+    75000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    TRUE,
+    FALSE,
+    FALSE,
+    '/uploads/events/jakarta-food-festival.jpg',
+    '/uploads/events/jakarta-food-festival-banner.jpg',
+    '2025-03-05'
+),
+
+-- Event 5: Art Exhibition (Free)
+(
+    'Contemporary Art Exhibition: "Modern Indonesia"',
+    'Pameran seni kontemporer yang menampilkan karya-karya seniman Indonesia terkemuka. Koleksi meliputi lukisan, patung, instalasi seni, digital art, dan fotografi. Tema pameran mengangkat identitas Indonesia modern dalam konteks global. Opening ceremony akan dihadiri oleh seniman dan kurator. Cocok untuk pecinta seni, kolektor, dan mahasiswa seni. Gratis untuk umum.',
+    'Pameran seni kontemporer karya seniman Indonesia terkemuka. Koleksi: lukisan, patung, instalasi, digital art.',
+    @category_art,
+    @admin_id,
+    '2025-03-15',
+    '10:00:00',
+    '2025-03-30',
+    '20:00:00',
+    'National Gallery of Indonesia',
+    'Jl. Medan Merdeka Timur No. 14, Jakarta Pusat',
+    'Jakarta',
+    'DKI Jakarta',
+    2000,
+    0.00,
+    'IDR',
+    TRUE,
+    TRUE,
+    'published',
+    FALSE,
+    FALSE,
+    FALSE,
+    '/uploads/events/art-exhibition.jpg',
+    '/uploads/events/art-exhibition-banner.jpg',
+    '2025-03-14'
+),
+
+-- Event 6: Health & Wellness Seminar (Medium Price)
+(
+    'Health & Wellness Summit 2025',
+    'Seminar kesehatan dan wellness dengan pembicara dokter spesialis, nutritionist, dan wellness coach. Topik meliputi: Preventive Healthcare, Mental Health Awareness, Nutrition & Diet, Fitness & Exercise, Stress Management, dan Healthy Lifestyle. Termasuk free health screening (blood pressure, blood sugar, BMI), konsultasi kesehatan gratis, dan goodie bag. Cocok untuk semua usia yang peduli dengan kesehatan.',
+    'Seminar kesehatan dengan dokter spesialis dan wellness coach. Termasuk free health screening dan konsultasi.',
+    @category_health,
+    @admin_id,
+    '2025-03-20',
+    '08:00:00',
+    '2025-03-20',
+    '16:00:00',
+    'Hotel Grand Indonesia',
+    'Jl. M.H. Thamrin No. 1, Jakarta Pusat',
+    'Jakarta',
+    'DKI Jakarta',
+    300,
+    200000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    FALSE,
+    FALSE,
+    TRUE,
+    '/uploads/events/health-wellness-summit.jpg',
+    '/uploads/events/health-wellness-summit-banner.jpg',
+    '2025-03-15'
+),
+
+-- Event 7: Startup Expo (Medium-High Price)
+(
+    'Indonesia Startup Expo 2025',
+    'Expo startup terbesar di Indonesia yang menampilkan lebih dari 200 startup dari berbagai sektor: Fintech, EdTech, HealthTech, E-commerce, dan Agritech. Acara meliputi: startup showcase, investor pitch session, networking dengan founder dan investor, workshop entrepreneurship, dan startup competition. Cocok untuk entrepreneur, investor, developer, dan mahasiswa yang tertarik dengan startup ecosystem.',
+    'Expo startup dengan 200+ startup dari berbagai sektor. Termasuk investor pitch, networking, dan workshop.',
+    @category_expo,
+    @admin_id,
+    '2025-03-25',
+    '09:00:00',
+    '2025-03-26',
+    '18:00:00',
+    'ICE BSD City',
+    'Jl. BSD Grand Boulevard, Tangerang',
+    'Tangerang',
+    'Banten',
+    2000,
+    150000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    TRUE,
+    TRUE,
+    FALSE,
+    '/uploads/events/startup-expo.jpg',
+    '/uploads/events/startup-expo-banner.jpg',
+    '2025-03-20'
+),
+
+-- Event 8: Photography Workshop (Medium Price)
+(
+    'Professional Photography Workshop',
+    'Workshop fotografi profesional selama 1 hari yang mengajarkan teknik fotografi dari basic hingga advanced. Materi meliputi: Camera Settings & Exposure, Composition Techniques, Portrait Photography, Landscape Photography, Post-Processing dengan Lightroom & Photoshop, dan Business Photography. Dibawakan oleh fotografer profesional dengan portfolio internasional. Termasuk hands-on practice dan review hasil foto peserta.',
+    'Workshop fotografi profesional: teknik dasar hingga advanced, portrait, landscape, dan post-processing.',
+    @category_workshop,
+    @admin_id,
+    '2025-04-05',
+    '09:00:00',
+    '2025-04-05',
+    '17:00:00',
+    'Yogyakarta Creative Space',
+    'Jl. Malioboro No. 123, Yogyakarta',
+    'Yogyakarta',
+    'DI Yogyakarta',
+    30,
+    350000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    FALSE,
+    FALSE,
+    TRUE,
+    '/uploads/events/photography-workshop.jpg',
+    '/uploads/events/photography-workshop-banner.jpg',
+    '2025-04-01'
+),
+
+-- Event 9: Music Festival (Low-Medium Price)
+(
+    'Java Music Festival 2025',
+    'Festival musik 2 hari yang menampilkan artis lokal dan internasional dari berbagai genre: Pop, Rock, Jazz, Electronic, dan Traditional. Lineup termasuk band terkenal, solo artist, dan DJ. Fasilitas: multiple stages, food court, merchandise booth, dan camping area. Cocok untuk pecinta musik, remaja, dan keluarga. Early bird discount tersedia.',
+    'Festival musik 2 hari dengan artis lokal dan internasional. Multiple stages, food court, dan camping area.',
+    @category_art,
+    @admin_id,
+    '2025-04-12',
+    '14:00:00',
+    '2025-04-13',
+    '23:00:00',
+    'Jogja Expo Center',
+    'Jl. Wonosari KM 10, Yogyakarta',
+    'Yogyakarta',
+    'DI Yogyakarta',
+    5000,
+    250000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    TRUE,
+    FALSE,
+    FALSE,
+    '/uploads/events/music-festival.jpg',
+    '/uploads/events/music-festival-banner.jpg',
+    '2025-04-05'
+),
+
+-- Event 10: Data Science Course (High Price)
+(
+    'Data Science & Machine Learning Course',
+    'Kursus intensif 4 hari untuk belajar Data Science dan Machine Learning dari dasar. Materi meliputi: Python Programming, Data Analysis dengan Pandas & NumPy, Data Visualization, Machine Learning Algorithms, Deep Learning Basics, dan Real-World Projects. Dibawakan oleh data scientist dari perusahaan teknologi besar. Termasuk dataset untuk latihan dan certificate. Cocok untuk programmer, analyst, dan profesional yang ingin masuk ke bidang data science.',
+    'Kursus intensif 4 hari Data Science & ML: Python, Pandas, ML Algorithms, Deep Learning. Termasuk certificate.',
+    @category_education,
+    @admin_id,
+    '2025-04-20',
+    '09:00:00',
+    '2025-04-23',
+    '17:00:00',
+    'Jakarta Tech Academy',
+    'Jl. Sudirman No. 52, Jakarta Pusat',
+    'Jakarta',
+    'DKI Jakarta',
+    40,
+    3500000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    TRUE,
+    TRUE,
+    TRUE,
+    '/uploads/events/data-science-course.jpg',
+    '/uploads/events/data-science-course-banner.jpg',
+    '2025-04-15'
+),
+
+-- Event 11: Business Networking (Medium Price)
+(
+    'Business Networking & Investment Forum',
+    'Forum networking bisnis dan investasi yang menghadirkan investor, entrepreneur sukses, dan business leader. Acara meliputi: keynote speeches, panel discussion, networking session, pitch session untuk startup, dan one-on-one meeting dengan investor. Cocok untuk entrepreneur, startup founder, investor, dan business professional yang ingin expand network dan mencari peluang investasi.',
+    'Forum networking bisnis dan investasi dengan investor dan entrepreneur sukses. Termasuk pitch session.',
+    @category_education,
+    @admin_id,
+    '2025-05-01',
+    '13:00:00',
+    '2025-05-01',
+    '20:00:00',
+    'The Ritz-Carlton Jakarta',
+    'Jl. Lingkar Mega Kuningan, Jakarta Selatan',
+    'Jakarta',
+    'DKI Jakarta',
+    200,
+    300000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    FALSE,
+    FALSE,
+    FALSE,
+    '/uploads/events/business-networking.jpg',
+    '/uploads/events/business-networking-banner.jpg',
+    '2025-04-25'
+),
+
+-- Event 12: Yoga & Meditation Retreat (Medium Price)
+(
+    'Yoga & Meditation Retreat Bali',
+    'Retreat yoga dan meditasi selama 3 hari di lokasi yang tenang di Bali. Program meliputi: morning yoga sessions, meditation classes, healthy meals, spa sessions, nature walks, dan wellness workshops. Dibimbing oleh certified yoga instructor dan meditation teacher. Cocok untuk yang ingin recharge, reduce stress, dan improve mental health. Termasuk akomodasi dan semua meals.',
+    'Retreat yoga & meditasi 3 hari di Bali. Termasuk yoga sessions, meditation, healthy meals, dan spa.',
+    @category_health,
+    @admin_id,
+    '2025-05-10',
+    '08:00:00',
+    '2025-05-12',
+    '18:00:00',
+    'Ubud Yoga Retreat Center',
+    'Jl. Raya Ubud, Gianyar, Bali',
+    'Gianyar',
+    'Bali',
+    25,
+    2500000.00,
+    'IDR',
+    FALSE,
+    TRUE,
+    'published',
+    TRUE,
+    FALSE,
+    FALSE,
+    '/uploads/events/yoga-retreat.jpg',
+    '/uploads/events/yoga-retreat-banner.jpg',
+    '2025-05-05'
+);
+

@@ -21,6 +21,7 @@ const Dashboard = () => {
     topEvents: []
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
@@ -46,10 +47,11 @@ const Dashboard = () => {
 
       // Extract data with proper null checks
       // API response structure: { success, message, data: { events: [], pagination: { total: ... } } }
-      const eventsData = eventsRes.data || eventsRes;
-      const usersData = usersRes.data || usersRes;
-      const registrationsData = registrationsRes.data || registrationsRes;
-      const categoriesData = categoriesRes.data || categoriesRes;
+      // API interceptor already returns response.data, so we need to handle both structures
+      const eventsData = eventsRes?.data || eventsRes || {};
+      const usersData = usersRes?.data || usersRes || {};
+      const registrationsData = registrationsRes?.data || registrationsRes || {};
+      const categoriesData = categoriesRes?.data || categoriesRes || {};
       
       const allEvents = eventsData.events || [];
       const allUsers = usersData.users || [];
@@ -101,6 +103,17 @@ const Dashboard = () => {
     } catch (error) {
       console.error('❌ Error fetching dashboard data:', error);
       console.error('Error details:', error.response?.data || error.message);
+      setError(error.message || 'Failed to load dashboard data');
+      // Set default values on error to prevent blank page
+      setStats({
+        totalEvents: 0,
+        activeEvents: 0,
+        totalUsers: 0,
+        totalRegistrations: 0,
+        totalCategories: 0,
+        recentEvents: [],
+        recentRegistrations: []
+      });
     } finally {
       setLoading(false);
     }
@@ -115,40 +128,79 @@ const Dashboard = () => {
       ]);
 
       setChartsData({
-        monthlyEvents: monthlyEventsRes.data?.monthlyEvents || [],
-        monthlyParticipants: monthlyParticipantsRes.data?.monthlyParticipants || [],
-        topEvents: topEventsRes.data?.topEvents || []
+        monthlyEvents: monthlyEventsRes.data?.monthlyEvents || monthlyEventsRes?.monthlyEvents || [],
+        monthlyParticipants: monthlyParticipantsRes.data?.monthlyParticipants || monthlyParticipantsRes?.monthlyParticipants || [],
+        topEvents: topEventsRes.data?.topEvents || topEventsRes?.topEvents || []
       });
     } catch (error) {
       console.error('❌ Error fetching charts data:', error);
+      // Set empty arrays on error
+      setChartsData({
+        monthlyEvents: [],
+        monthlyParticipants: [],
+        topEvents: []
+      });
     }
   };
 
-  const StatCard = ({ title, value, icon: Icon, accent = 'blue' }) => (
-    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-      <div className={`p-3 rounded-lg bg-${accent}-50 text-${accent}-600`}>
-        <Icon className="w-5 h-5" />
+  const StatCard = ({ title, value, icon: Icon, accent = 'blue' }) => {
+    // Map accent to actual Tailwind classes
+    const accentClasses = {
+      blue: 'bg-blue-50 text-blue-600',
+      green: 'bg-green-50 text-green-600',
+      purple: 'bg-purple-50 text-purple-600',
+      orange: 'bg-orange-50 text-orange-600',
+      pink: 'bg-pink-50 text-pink-600'
+    };
+    
+    return (
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+        <div className={`p-3 rounded-lg ${accentClasses[accent] || accentClasses.blue}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-500">{title}</p>
+          <p className="text-2xl font-semibold text-gray-900">{value}</p>
+        </div>
       </div>
-      <div>
-        <p className="text-xs uppercase tracking-wide text-gray-500">{title}</p>
-        <p className="text-2xl font-semibold text-gray-900">{value}</p>
-      </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-black text-lg">Loading dashboard data...</p>
+          <p className="text-gray-700 text-lg font-medium">Loading dashboard data...</p>
+          <p className="text-gray-500 text-sm mt-2">Please wait...</p>
         </div>
       </div>
     );
   }
 
+  // Show error message but still render the page
+  if (error) {
+    console.warn('⚠️ Dashboard error:', error);
+  }
+
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                <strong>Warning:</strong> {error}. Some data may not be available.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
@@ -191,8 +243,8 @@ const Dashboard = () => {
       {/* Secondary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Kategori" value={stats.totalCategories} icon={FolderPlus} accent="pink" />
-        <StatCard title="Event terbaru" value={stats.recentEvents.length} icon={LayoutList} accent="indigo" />
-        <StatCard title="Aktivitas terbaru" value={stats.recentRegistrations.length} icon={ClipboardList} accent="cyan" />
+        <StatCard title="Event terbaru" value={stats.recentEvents.length} icon={LayoutList} accent="blue" />
+        <StatCard title="Aktivitas terbaru" value={stats.recentRegistrations.length} icon={ClipboardList} accent="purple" />
       </div>
 
       {/* Charts */}
@@ -208,9 +260,9 @@ const Dashboard = () => {
             </div>
           </div>
           <BarChart
-            data={chartsData.monthlyEvents.map(item => ({
-              label: item.month_name.substring(0, 3),
-              value: item.total_events
+            data={(chartsData.monthlyEvents || []).map(item => ({
+              label: (item.month_name || '').substring(0, 3),
+              value: item.total_events || 0
             }))}
             xAxisLabel="Bulan"
             yAxisLabel="Event"
@@ -229,9 +281,9 @@ const Dashboard = () => {
             </div>
           </div>
           <BarChart
-            data={chartsData.monthlyParticipants.map(item => ({
-              label: item.month_name.substring(0, 3),
-              value: item.total_participants
+            data={(chartsData.monthlyParticipants || []).map(item => ({
+              label: (item.month_name || '').substring(0, 3),
+              value: item.total_participants || 0
             }))}
             xAxisLabel="Bulan"
             yAxisLabel="Peserta"
@@ -250,9 +302,9 @@ const Dashboard = () => {
             </div>
           </div>
           <BarChart
-            data={chartsData.topEvents.map(item => ({
-              label: item.title.length > 15 ? `${item.title.slice(0, 12)}…` : item.title,
-              value: item.participant_count
+            data={(chartsData.topEvents || []).map(item => ({
+              label: (item.title || '').length > 15 ? `${(item.title || '').slice(0, 12)}…` : (item.title || ''),
+              value: item.participant_count || 0
             }))}
             xAxisLabel="Event"
             yAxisLabel="Peserta"
@@ -276,24 +328,30 @@ const Dashboard = () => {
             </button>
           </div>
           <div className="space-y-4">
-            {stats.recentEvents.slice(0, 5).map((event) => (
-              <div key={event.id} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center mr-4">
-                  <Calendar className="w-6 h-6 text-gray-600" />
+            {stats.recentEvents && stats.recentEvents.length > 0 ? (
+              stats.recentEvents.slice(0, 5).map((event) => (
+                <div key={event.id} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center mr-4">
+                    <Calendar className="w-6 h-6 text-gray-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-black font-medium">{event.title || 'Untitled Event'}</h4>
+                    <p className="text-gray-600 text-sm">{event.event_date ? new Date(event.event_date).toLocaleDateString() : 'No date'}</p>
+                  </div>
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    event.status === 'published' ? 'bg-green-100 text-green-700' :
+                    event.status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {event.status || 'unknown'}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h4 className="text-black font-medium">{event.title}</h4>
-                  <p className="text-gray-600 text-sm">{new Date(event.event_date).toLocaleDateString()}</p>
-                </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  event.status === 'published' ? 'bg-green-100 text-green-700' :
-                  event.status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-red-100 text-red-700'
-                }`}>
-                  {event.status}
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No recent events</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 

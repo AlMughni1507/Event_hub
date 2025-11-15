@@ -30,28 +30,47 @@ const ReviewsPage = () => {
       return;
     }
     fetchReviews();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
+
+  // Update form data when user changes
+  useEffect(() => {
+    if (user && !existingReview) {
+      setFormData(prev => ({
+        ...prev,
+        full_name: user.full_name || prev.full_name || ''
+      }));
+    }
+  }, [user, existingReview]);
 
   const fetchReviews = async () => {
     try {
       const response = await reviewsAPI.getAll();
-      const allReviews = response.reviews || response.data || response || [];
+      
+      // Backend returns: { success: true, data: { reviews: [...], pagination: {...} }, message: '...' }
+      // API interceptor returns: response.data which is { reviews: [...], pagination: {...} }
+      const allReviews = response?.reviews || response?.data?.reviews || (Array.isArray(response) ? response : []);
       setReviews(Array.isArray(allReviews) ? allReviews : []);
       
       // Check if user already has a review
-      if (user) {
+      if (user && allReviews.length > 0) {
         const userReview = allReviews.find(r => r.user_id === user.id);
         if (userReview) {
           setExistingReview(userReview);
           setFormData({
             rating: userReview.rating,
             comment: userReview.comment,
-            full_name: userReview.full_name
+            full_name: userReview.full_name || user.full_name || ''
           });
+        } else {
+          setExistingReview(null);
         }
+      } else if (user && allReviews.length === 0) {
+        setExistingReview(null);
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);
+      setReviews([]);
+      setExistingReview(null);
     } finally {
       setLoading(false);
     }
@@ -60,39 +79,64 @@ const ReviewsPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (!formData.full_name || formData.full_name.trim().length === 0) {
+      toast.error('Nama lengkap wajib diisi!');
+      return;
+    }
+    
     if (formData.comment.trim().length < 10) {
       toast.error('Ulasan minimal 10 karakter');
       return;
     }
 
+    if (!user || !user.id) {
+      toast.error('Anda harus login untuk memberikan ulasan');
+      navigate('/login');
+      return;
+    }
+
     setSubmitting(true);
     try {
+      const payload = {
+        rating: formData.rating,
+        comment: formData.comment.trim(),
+        full_name: formData.full_name.trim(),
+        user_id: user.id
+      };
+
+      let response;
       if (existingReview) {
         // Update existing review
-        await reviewsAPI.update(existingReview.id, {
-          ...formData,
-          user_id: user.id
-        });
+        response = await reviewsAPI.update(existingReview.id, payload);
         toast.success('Ulasan berhasil diperbarui! Terima kasih atas feedback Anda');
+        setExistingReview(null); // Reset to allow refresh
       } else {
         // Create new review
-        await reviewsAPI.create({
-          ...formData,
-          user_id: user.id
-        });
-        toast.success('Ulasan berhasil dikirim! Terima kasih atas feedback Anda');
+        response = await reviewsAPI.create(payload);
+        toast.success('Ulasan berhasil dikirim! Ulasan akan tampil setelah disetujui admin.');
       }
       
-      // Refresh reviews
-      fetchReviews();
+      // Reset form
+      setFormData({
+        rating: 5,
+        comment: '',
+        full_name: user?.full_name || ''
+      });
+      
+      // Refresh reviews after a short delay to ensure backend has processed
+      setTimeout(async () => {
+        await fetchReviews();
+      }, 500);
       setIsEditing(false);
     } catch (error) {
       console.error('Error submitting review:', error);
-      const errorMessage = error?.message || error?.error || 'Gagal mengirim ulasan. Silakan coba lagi';
+      const errorMessage = error?.message || error?.error || error?.data?.message || 'Gagal mengirim ulasan. Silakan coba lagi';
       
       // Check if user already submitted a review
-      if (errorMessage.includes('already submitted') || errorMessage.includes('already')) {
-        toast.error('Anda sudah pernah memberikan ulasan. Silakan gunakan tombol "Edit Ulasan" untuk mengubahnya.');
+      if (errorMessage.toLowerCase().includes('already') || errorMessage.toLowerCase().includes('sudah')) {
+        toast.error('Anda sudah pernah memberikan ulasan. Silakan edit ulasan yang sudah ada.');
+        // Fetch reviews to get existing review
+        await fetchReviews();
       } else {
         toast.error(errorMessage);
       }
@@ -134,13 +178,15 @@ const ReviewsPage = () => {
       <section className="relative bg-gradient-to-br from-purple-600 via-pink-600 to-rose-600 py-20 overflow-hidden">
         {/* Animated Background Elements */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse-slow"></div>
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-300/20 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }}></div>
+          <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-300/15 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+          
           {/* Floating particles */}
-          {[...Array(25)].map((_, i) => (
+          {[...Array(30)].map((_, i) => (
             <div
               key={i}
-              className="absolute rounded-full bg-white/20"
+              className="absolute rounded-full bg-white/20 animate-float"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
@@ -151,17 +197,18 @@ const ReviewsPage = () => {
               }}
             ></div>
           ))}
+          
           {/* Rotating gradient orbs */}
-          {[...Array(3)].map((_, i) => (
+          {[...Array(4)].map((_, i) => (
             <div
               key={`orb-${i}`}
-              className="absolute rounded-full blur-3xl"
+              className="absolute rounded-full blur-3xl animate-rotate"
               style={{
-                left: `${30 + i * 25}%`,
-                top: `${30 + i * 20}%`,
+                left: `${20 + i * 20}%`,
+                top: `${20 + i * 15}%`,
                 width: `${150 + i * 80}px`,
                 height: `${150 + i * 80}px`,
-                background: `radial-gradient(circle, rgba(147,51,234,0.3), rgba(236,72,153,0.2))`,
+                background: `radial-gradient(circle, rgba(147,51,234,${0.2 + i * 0.1}), rgba(236,72,153,${0.15 + i * 0.05}))`,
                 animation: `rotate ${20 + i * 10}s linear infinite`,
                 animationDelay: `${i * 3}s`
               }}
@@ -449,14 +496,61 @@ const ReviewsPage = () => {
 
       {/* Custom Scrollbar Styles & Animations */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;600;700;900&display=swap');
+        
+        .font-bebas { font-family: 'Bebas Neue', cursive; }
+        .font-poppins { font-family: 'Poppins', sans-serif; }
+        
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%, 100% { 
+            transform: translateY(0px) translateX(0px); 
+            opacity: 0.8;
+          }
+          25% { 
+            transform: translateY(-15px) translateX(5px); 
+            opacity: 1;
+          }
+          50% { 
+            transform: translateY(-25px) translateX(-5px); 
+            opacity: 0.9;
+          }
+          75% { 
+            transform: translateY(-10px) translateX(3px); 
+            opacity: 1;
+          }
         }
+        
         @keyframes rotate {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+          0% { 
+            transform: rotate(0deg) scale(1); 
+            opacity: 0.3;
+          }
+          50% { 
+            transform: rotate(180deg) scale(1.1); 
+            opacity: 0.5;
+          }
+          100% { 
+            transform: rotate(360deg) scale(1); 
+            opacity: 0.3;
+          }
         }
+        
+        @keyframes pulse {
+          0%, 100% { 
+            opacity: 0.4;
+            transform: scale(1);
+          }
+          50% { 
+            opacity: 0.6;
+            transform: scale(1.05);
+          }
+        }
+        
+        @keyframes shimmer {
+          0% { background-position: -1000px 0; }
+          100% { background-position: 1000px 0; }
+        }
+        
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }
@@ -467,9 +561,23 @@ const ReviewsPage = () => {
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: linear-gradient(to bottom, #9333ea, #ec4899);
           border-radius: 10px;
+          transition: background 0.3s ease;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: linear-gradient(to bottom, #7e22ce, #db2777);
+        }
+        
+        /* Enhanced animations for header elements */
+        .animate-float {
+          animation: float 4s ease-in-out infinite;
+        }
+        
+        .animate-rotate {
+          animation: rotate 20s linear infinite;
+        }
+        
+        .animate-pulse-slow {
+          animation: pulse 3s ease-in-out infinite;
         }
       `}</style>
     </div>

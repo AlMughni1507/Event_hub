@@ -20,6 +20,9 @@ import SettingsPage from './pages/settings/profile';
 import AttendancePage from './pages/attendance/AttendancePage';
 import ReviewsPage from './pages/reviews/ReviewsPage';
 import MyEvents from './pages/user/MyEvents';
+import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
+import PaymentPendingPage from './pages/payment/PaymentPendingPage';
+import PaymentErrorPage from './pages/payment/PaymentErrorPage';
 // Removed separate pages - now integrated into Settings
 
 // Admin Components
@@ -118,6 +121,9 @@ const AnimatedRoutes = () => {
           <Route path="/my-events" element={<PageTransition><MyEvents /></PageTransition>} />
           <Route path="/reviews" element={<PageTransition><ReviewsPage /></PageTransition>} />
           <Route path="/attendance/:eventId" element={<PageTransition><AttendancePage /></PageTransition>} />
+          <Route path="/payment/success" element={<PageTransition><PaymentSuccessPage /></PageTransition>} />
+          <Route path="/payment/pending" element={<PageTransition><PaymentPendingPage /></PageTransition>} />
+          <Route path="/payment/error" element={<PageTransition><PaymentErrorPage /></PageTransition>} />
             
           {/* Admin Routes */}
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>

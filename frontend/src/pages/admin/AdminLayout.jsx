@@ -25,11 +25,29 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [quickStats, setQuickStats] = useState({ events: 0, users: 0 });
   const [quickLoading, setQuickLoading] = useState(true);
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-black font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not admin
+  if (!user || user.role !== 'admin') {
+    navigate('/');
+    return null;
+  }
 
   useEffect(() => {
     // Set active menu based on current path
@@ -45,8 +63,9 @@ const AdminLayout = () => {
           adminAPI.getAllUsers({ limit: 1 })
         ]);
 
-        const eventsData = eventsRes.data || {};
-        const usersData = usersRes.data || {};
+        // Handle different response structures
+        const eventsData = eventsRes?.data || eventsRes || {};
+        const usersData = usersRes?.data || usersRes || {};
 
         setQuickStats({
           events: eventsData.pagination?.total || eventsData.events?.length || 0,
@@ -54,6 +73,8 @@ const AdminLayout = () => {
         });
       } catch (error) {
         console.error('Failed to fetch quick stats:', error);
+        // Set default values on error
+        setQuickStats({ events: 0, users: 0 });
       } finally {
         setQuickLoading(false);
       }

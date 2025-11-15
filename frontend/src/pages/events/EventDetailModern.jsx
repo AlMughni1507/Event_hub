@@ -46,8 +46,11 @@ const EventDetailModern = () => {
       setCheckingRegistration(true);
       try {
         const response = await api.get(`/registrations/check/${event.id}`);
-        if (response.data?.success) {
-          setIsRegistered(response.data.data?.is_registered || false);
+        // API interceptor returns response.data
+        const responseData = response?.data || response;
+        if (responseData?.success !== false) {
+          const checkData = responseData?.data || responseData;
+          setIsRegistered(checkData?.is_registered || false);
         } else {
           setIsRegistered(false);
         }
@@ -65,7 +68,9 @@ const EventDetailModern = () => {
   const fetchPerformers = async () => {
     try {
       const response = await api.get(`/performers/event/${id}`);
-      setPerformers(response.data.performers || []);
+      // Handle different response structures
+      const performers = response?.data?.performers || response?.performers || response?.data || [];
+      setPerformers(Array.isArray(performers) ? performers : []);
     } catch (error) {
       console.error('Error fetching performers:', error);
       setPerformers([]);
@@ -103,45 +108,172 @@ const EventDetailModern = () => {
 
     setRegistering(true);
     try {
-      const payload = isFreeEvent
-        ? {
-            event_id: event.id,
-            payment_method: 'free',
-            full_name: user?.full_name,
-            email: user?.email,
-            phone: user?.phone,
-          }
-        : {
-            event_id: event.id,
-            user_id: user.id,
-          };
+      // Validate user has required data for free events
+      if (isFreeEvent) {
+        if (!user?.full_name || user.full_name.trim().length < 2) {
+          alert('❌ Nama lengkap wajib diisi di profil Anda. Silakan lengkapi profil terlebih dahulu.');
+          navigate('/settings');
+          setRegistering(false);
+          return;
+        }
+        if (!user?.email || !user.email.includes('@')) {
+          alert('❌ Email wajib diisi di profil Anda. Silakan lengkapi profil terlebih dahulu.');
+          navigate('/settings');
+          setRegistering(false);
+          return;
+        }
+      }
+
+      // Prepare payload with all required fields
+      const payload = {
+        event_id: event.id,
+        payment_method: isFreeEvent ? 'free' : 'cash',
+        full_name: user?.full_name || user?.username || '',
+        email: user?.email || '',
+        phone: user?.phone || user?.phone_number || '',
+        address: user?.address || '',
+        city: user?.city || '',
+        province: user?.province || '',
+        institution: user?.institution || '',
+        notes: ''
+      };
+
+      console.log('📤 Sending registration payload:', payload);
+      console.log('📤 Is Free Event:', isFreeEvent);
+      console.log('📤 User:', user);
 
       const response = await api.post('/registrations', payload);
-      const success = response.data?.success !== false;
+      
+      console.log('📥 Registration response:', response);
+      
+      // API interceptor returns response.data which is { success, message, data }
+      // But sometimes it might be the full response object
+      const responseData = response?.data || response;
+      const success = responseData?.success !== false;
+      const message = responseData?.message || 'Registrasi berhasil!';
 
       if (success) {
-        setIsRegistered(true);
-        setParticipantCount((prev) => prev + 1);
-        alert(
-          isFreeEvent
-            ? '✅ Pendaftaran berhasil! Token kehadiran telah dikirim ke email Anda.'
-            : 'Registrasi berhasil!'
-        );
-        fetchEventDetails();
-        if (!isFreeEvent) {
-          navigate('/settings');
+        if (isFreeEvent) {
+          // Free event - registration confirmed immediately
+          setIsRegistered(true);
+          setParticipantCount((prev) => prev + 1);
+          alert('✅ Pendaftaran berhasil! Token kehadiran telah dikirim ke email Anda.');
+          await fetchEventDetails();
+          // Re-check registration status
+          try {
+            const checkResponse = await api.get(`/registrations/check/${event.id}`);
+            if (checkResponse?.data?.success) {
+              setIsRegistered(checkResponse.data.data?.is_registered || false);
+            }
+          } catch (checkError) {
+            console.error('Error checking registration:', checkError);
+          }
+        } else {
+          // Paid event - redirect to payment
+          const registrationData = responseData?.data || responseData;
+          const registrationId = registrationData?.id;
+          
+          if (registrationId) {
+            // Create payment transaction
+            try {
+              const paymentResponse = await api.post('/payments/create-transaction', {
+                event_id: event.id,
+                registration_id: registrationId
+              });
+              
+              const paymentData = paymentResponse?.data || paymentResponse;
+              
+              if (paymentData?.token && paymentData?.client_key) {
+                // Load Midtrans Snap.js dynamically if not already loaded
+                const loadSnapAndPay = () => {
+                  if (window.snap) {
+                    window.snap.pay(paymentData.token, {
+                      onSuccess: function(result) {
+                        console.log('Payment success:', result);
+                        navigate(`/payment/success?order_id=${result.order_id}`);
+                      },
+                      onPending: function(result) {
+                        console.log('Payment pending:', result);
+                        navigate(`/payment/pending?order_id=${result.order_id}`);
+                      },
+                      onError: function(result) {
+                        console.log('Payment error:', result);
+                        navigate(`/payment/error?order_id=${result.order_id}`);
+                      },
+                      onClose: function() {
+                        console.log('Payment popup closed');
+                        alert('Pembayaran dibatalkan. Anda dapat mencoba lagi nanti.');
+                      }
+                    });
+                  } else {
+                    console.error('Midtrans Snap.js not loaded');
+                    alert('Gagal memuat payment gateway. Silakan refresh halaman dan coba lagi.');
+                  }
+                };
+
+                if (!window.snap) {
+                  const script = document.createElement('script');
+                  script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
+                  script.setAttribute('data-client-key', paymentData.client_key);
+                  script.onload = loadSnapAndPay;
+                  script.onerror = () => {
+                    alert('Gagal memuat payment gateway. Silakan coba lagi.');
+                  };
+                  document.head.appendChild(script);
+                } else {
+                  loadSnapAndPay();
+                }
+              } else {
+                throw new Error('Failed to get payment token');
+              }
+            } catch (paymentError) {
+              console.error('Payment error:', paymentError);
+              alert('Registrasi berhasil, tetapi gagal membuat transaksi pembayaran. Silakan hubungi admin.');
+            }
+          } else {
+            alert('Registrasi berhasil! Silakan selesaikan pembayaran.');
+            navigate('/settings');
+          }
         }
       } else {
-        throw new Error(response.data?.message || 'Gagal melakukan registrasi');
+        throw new Error(responseData?.message || 'Gagal melakukan registrasi');
       }
     } catch (error) {
-      console.error('Error registering:', error);
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        error.message ||
-        'Gagal melakukan registrasi. Silakan coba lagi.';
-      alert(errorMessage);
+      console.error('❌ Error registering:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        fullError: error
+      });
+      
+      let errorMessage = 'Gagal melakukan registrasi. Silakan coba lagi.';
+      
+      // API interceptor already processes error.response.data
+      const errorData = error.response?.data || error;
+      
+      if (errorData) {
+        // Handle validation errors (422)
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors.map(e => `${e.field}: ${e.message}`).join('\n');
+        } 
+        // Handle error message
+        else if (errorData.message) {
+          errorMessage = errorData.message;
+        } 
+        // Handle error field
+        else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        // Handle string error
+        else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`❌ ${errorMessage}\n\nSilakan cek console untuk detail lebih lanjut.`);
     } finally {
       setRegistering(false);
     }

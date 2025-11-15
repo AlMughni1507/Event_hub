@@ -13,6 +13,7 @@ const BlogManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, blogId: null });
   const [formData, setFormData] = useState({
     title: '',
@@ -49,11 +50,38 @@ const BlogManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Validate required fields
+      if (!formData.title || !formData.content) {
+        toast.error('Judul dan konten blog wajib diisi!');
+        return;
+      }
+
+      // Validate image - required for new blog, optional for edit
+      if (!editingBlog && !imageFile) {
+        toast.error('Gambar featured wajib diupload! Silakan pilih gambar yang akan digunakan.');
+        return;
+      }
+
+      // Create FormData for file upload
+      const submitData = new FormData();
+      submitData.append('title', formData.title);
+      submitData.append('content', formData.content);
+      submitData.append('excerpt', formData.excerpt || '');
+      submitData.append('category', formData.category);
+      submitData.append('status', formData.status);
+      submitData.append('tags', formData.tags || '');
+      submitData.append('is_featured', 'false');
+      
+      // Append image file if selected (required for new, optional for edit)
+      if (imageFile) {
+        submitData.append('featured_image', imageFile);
+      }
+
       if (editingBlog) {
-        await blogsAPI.update(editingBlog.id, formData);
+        await blogsAPI.update(editingBlog.id, submitData);
         toast.success('Blog berhasil diupdate!');
       } else {
-        await blogsAPI.create(formData);
+        await blogsAPI.create(submitData);
         toast.success('Blog berhasil dibuat!');
       }
       setShowForm(false);
@@ -74,12 +102,15 @@ const BlogManagement = () => {
       excerpt: blog.excerpt || '',
       featured_image: blog.featured_image || '',
       status: blog.status,
-      tags: blog.tags || '',
+      tags: Array.isArray(blog.tags) ? blog.tags.join(', ') : (blog.tags || ''),
       category: blog.category || 'general'
     });
     if (blog.featured_image) {
-      setImagePreview(blog.featured_image);
+      setImagePreview(`http://localhost:3000${blog.featured_image}`);
+    } else {
+      setImagePreview(null);
     }
+    setImageFile(null);
     setShowForm(true);
   };
 
@@ -101,11 +132,30 @@ const BlogManagement = () => {
   };
 
   const handleImageChange = (e) => {
-    const url = e.target.value;
-    setFormData({...formData, featured_image: url});
-    if (url) {
-      setImagePreview(url);
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Hanya file gambar yang diperbolehkan!');
+        return;
+      }
+      
+      // Validate file size (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Ukuran file maksimal 5MB!');
+        return;
+      }
+
+      setImageFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
     } else {
+      setImageFile(null);
       setImagePreview(null);
     }
   };
@@ -121,6 +171,7 @@ const BlogManagement = () => {
       category: 'general'
     });
     setImagePreview(null);
+    setImageFile(null);
   };
 
   const handleCancel = () => {
@@ -309,13 +360,14 @@ const BlogManagement = () => {
                 <div className="flex gap-6">
                   {/* Blog Image */}
                   {blog.featured_image ? (
-                    <div className="flex-shrink-0 w-48 h-32 rounded-xl overflow-hidden">
+                    <div className="flex-shrink-0 w-48 h-32 rounded-xl overflow-hidden bg-gray-100">
                       <img
-                        src={blog.featured_image}
+                        src={`http://localhost:3000${blog.featured_image}`}
                         alt={blog.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                         onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/400x300?text=No+Image';
+                          e.target.style.display = 'none';
+                          e.target.parentElement.innerHTML = '<div class="w-full h-full bg-gray-200 flex items-center justify-center"><svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>';
                         }}
                       />
                     </div>
@@ -528,28 +580,62 @@ const BlogManagement = () => {
                     </select>
                   </div>
 
-                  {/* Featured Image */}
+                  {/* Featured Image Upload */}
                   <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Featured Image URL</label>
-                    <input
-                      type="url"
-                      value={formData.featured_image}
-                      onChange={handleImageChange}
-                      placeholder="https://example.com/image.jpg"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                    {imagePreview && (
-                      <div className="mt-4 rounded-xl overflow-hidden border-2 border-gray-200">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-48 object-cover"
-                          onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/400x300?text=Invalid+URL';
-                          }}
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Featured Image *
+                    </label>
+                    <div className="space-y-4">
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <svg className="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          <p className="mb-2 text-sm text-gray-500">
+                            <span className="font-semibold">Klik untuk upload</span> atau drag & drop
+                          </p>
+                          <p className="text-xs text-gray-500">PNG, JPG, GIF (MAX. 5MB)</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
                         />
-                      </div>
-                    )}
+                      </label>
+                      {imagePreview && (
+                        <div className="mt-4 rounded-xl overflow-hidden border-2 border-gray-200">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-48 object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImagePreview(null);
+                              setImageFile(null);
+                            }}
+                            className="w-full mt-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors text-sm font-medium"
+                          >
+                            Hapus Gambar
+                          </button>
+                        </div>
+                      )}
+                      {!imagePreview && editingBlog && editingBlog.featured_image && (
+                        <div className="mt-4 rounded-xl overflow-hidden border-2 border-gray-200">
+                          <img
+                            src={`http://localhost:3000${editingBlog.featured_image}`}
+                            alt="Current"
+                            className="w-full h-48 object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                          <p className="text-xs text-gray-500 mt-2 text-center">Gambar saat ini (upload gambar baru untuk mengganti)</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Preview Info */}

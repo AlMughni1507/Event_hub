@@ -18,6 +18,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Prevent caching for API calls
+    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    config.headers['Pragma'] = 'no-cache';
+    config.headers['Expires'] = '0';
     return config;
   },
   (error) => {
@@ -28,8 +32,8 @@ api.interceptors.request.use(
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
-    console.log('🔍 API Response:', response.data);
-    return response.data;
+    // Return the data directly (backend returns { success, message, data })
+    return response.data || response;
   },
   (error) => {
     console.error('🔍 API Error:', error.response?.data || error.message);
@@ -163,8 +167,28 @@ export const certificatesAPI = {
 export const blogsAPI = {
   getAll: (params) => api.get('/blogs', { params }),
   getById: (id) => api.get(`/blogs/${id}`),
-  create: (data) => api.post('/blogs', data),
-  update: (id, data) => api.put(`/blogs/${id}`, data),
+  create: (data) => {
+    // If data is FormData, don't set Content-Type header (browser will set it with boundary)
+    if (data instanceof FormData) {
+      return api.post('/blogs', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    }
+    return api.post('/blogs', data);
+  },
+  update: (id, data) => {
+    // If data is FormData, don't set Content-Type header (browser will set it with boundary)
+    if (data instanceof FormData) {
+      return api.put(`/blogs/${id}`, data, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    }
+    return api.put(`/blogs/${id}`, data);
+  },
   delete: (id) => api.delete(`/blogs/${id}`),
 };
 

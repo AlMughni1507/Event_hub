@@ -171,12 +171,22 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     const registrantName = (full_name || req.user.full_name || '').trim();
     const registrantEmail = (email || req.user.email || '').trim();
     const registrantPhone = (phone || req.user.phone || '').trim();
-    const registrantAddress = address || req.user.address || '';
-    const registrantCity = city || req.user.city || '';
-    const registrantProvince = province || req.user.province || '';
-    const registrantInstitution = institution || req.user.institution || '';
-
+    const registrantAddress = (address || req.user.address || '').trim();
+    const registrantCity = (city || req.user.city || '').trim();
+    const registrantProvince = (province || req.user.province || '').trim();
+    const registrantInstitution = (institution || req.user.institution || '').trim();
+    
     const isFreeEvent = event.is_free === 1 || parseFloat(event.price || 0) === 0;
+    
+    // Validate required fields for free events
+    if (isFreeEvent) {
+      if (!registrantName || registrantName.length < 2) {
+        return ApiResponse.badRequest(res, 'Nama lengkap wajib diisi (minimal 2 karakter)');
+      }
+      if (!registrantEmail || !registrantEmail.includes('@')) {
+        return ApiResponse.badRequest(res, 'Email wajib diisi dan harus valid');
+      }
+    }
 
     const registrationStatus = isFreeEvent ? 'confirmed' : 'pending';
     const paymentStatus = isFreeEvent ? 'paid' : 'pending';
