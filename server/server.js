@@ -120,6 +120,48 @@ app.get('/api/db-test', async (req, res) => {
   }
 });
 
+// Static files health check
+app.get('/api/static-health', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  
+  const distPath = path.join(__dirname, 'dist');
+  
+  try {
+    // Check if dist folder exists
+    if (!fs.existsSync(distPath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'dist folder not found',
+        path: distPath
+      });
+    }
+    
+    // List files in dist
+    const files = fs.readdirSync(distPath);
+    
+    // Check for key files
+    const indexHtml = fs.existsSync(path.join(distPath, 'index.html'));
+    const assetsFolder = fs.existsSync(path.join(distPath, 'assets'));
+    
+    res.json({
+      success: true,
+      message: 'Static files health check',
+      distPath: distPath,
+      fileCount: files.length,
+      files: files.slice(0, 10), // First 10 files
+      indexHtmlExists: indexHtml,
+      assetsFolderExists: assetsFolder
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error checking static files',
+      error: error.message
+    });
+  }
+});
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
@@ -167,7 +209,27 @@ console.log('✅ Reports routes registered at /api/admin/reports');
 // Serve static files from frontend build (for production)
 if (process.env.NODE_ENV === 'production') {
   const frontendBuildPath = path.join(__dirname, 'dist');
-  app.use(express.static(frontendBuildPath));
+  console.log('📁 Serving static files from:', frontendBuildPath);
+  
+  // Log when static files are requested
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/assets/') || req.path.endsWith('.js') || req.path.endsWith('.css')) {
+      console.log('🔍 Static file request:', req.path);
+    }
+    next();
+  });
+  
+  app.use(express.static(frontendBuildPath, {
+    setHeaders: (res, path, stat) => {
+      console.log('📄 Serving file:', path);
+      // Ensure proper MIME types
+      if (path.endsWith('.js')) {
+        res.set('Content-Type', 'application/javascript');
+      } else if (path.endsWith('.css')) {
+        res.set('Content-Type', 'text/css');
+      }
+    }
+  }));
   
   // Serve index.html for all non-API routes (SPA support)
   app.get('*', (req, res, next) => {
@@ -175,6 +237,7 @@ if (process.env.NODE_ENV === 'production') {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next();
     }
+    console.log('🏠 SPA route:', req.path);
     res.sendFile(path.join(frontendBuildPath, 'index.html'));
   });
 }
