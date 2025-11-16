@@ -4,10 +4,11 @@ import { Calendar, MapPin, Users, Clock, ArrowRight, Ticket, Star, UserCircle2, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { FadeInUp, FadeInLeft, FadeInRight, ScaleIn, StaggerContainer, StaggerItem, HoverScale, RevealOnScroll, RotateIn } from '../../components/ScrollAnimation';
 import { useAuth } from '../../contexts/AuthContext';
-import { eventsAPI } from '../../services/api';
+import { eventsAPI, reviewsAPI } from '../../services/api';
 import api from '../../services/api';
 import Footer from '../../components/Footer';
 import { getEventImageUrl, getApiBaseUrl } from '../../lib/utils';
+import { useToast } from '../../contexts/ToastContext';
 
 // Helper function to get category icons (Lucide React)
 const getCategoryIcon = (categoryName) => {
@@ -58,7 +59,15 @@ const HomePage = () => {
   const [dominantColor, setDominantColor] = useState({ r: 147, g: 51, b: 234 }); // Default purple
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
+  const toast = useToast();
   const hasFetched = useRef(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewForm, setReviewForm] = useState({
+    rating: 5,
+    comment: '',
+    full_name: user?.full_name || ''
+  });
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   // Extract dominant color from image
   const extractDominantColor = (imageSrc) => {
@@ -109,28 +118,27 @@ const HomePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch events
-  useEffect(() => {
-    let isMounted = true; // Track if component is mounted
-
-    const fetchEvents = async () => {
-      // Skip if already fetching or component unmounted
-      if (hasFetched.current || !isMounted) {
-        console.log('Skipping fetch - already in progress or unmounted');
-        return;
-      }
-      
+  // Fetch events function
+  const fetchEvents = React.useCallback(async (forceRefresh = false) => {
+    // Skip if already fetching (unless force refresh)
+    if (!forceRefresh && hasFetched.current) {
+      console.log('Skipping fetch - already in progress');
+      return;
+    }
+    
+    if (!forceRefresh) {
       hasFetched.current = true;
+    }
       
-      try {
-        // Fetch highlighted event for hero section
-        const apiBaseUrl = getApiBaseUrl();
-        const highlightedResponse = await fetch(`${apiBaseUrl}/events/highlighted/event`);
-        const highlightedData = await highlightedResponse.json();
-        
-        console.log('✅ Highlighted event response:', highlightedData);
-        
-        if (highlightedData.success && highlightedData.data && isMounted) {
+    try {
+      // Fetch highlighted event for hero section
+      const apiBaseUrl = getApiBaseUrl();
+      const highlightedResponse = await fetch(`${apiBaseUrl}/events/highlighted/event`);
+      const highlightedData = await highlightedResponse.json();
+      
+      console.log('✅ Highlighted event response:', highlightedData);
+      
+      if (highlightedData.success && highlightedData.data) {
           setFeaturedEvent(highlightedData.data);
           console.log('✅ Featured event set:', highlightedData.data.title);
           
@@ -149,41 +157,38 @@ const HomePage = () => {
         
         console.log('✅ All events fetched:', events.length);
         
-        // If no featured event was set, use the first event as featured
-        if (!highlightedData.data && events.length > 0 && isMounted) {
-          console.log('📌 Setting first event as featured:', events[0].title);
-          setFeaturedEvent(events[0]);
-          
-          // Extract color from event image
-          if (events[0].image_url || events[0].image) {
-            const imageUrl = getEventImageUrl(events[0].image_url || events[0].image);
-            extractDominantColor(imageUrl);
-          }
+      // If no featured event was set, use the first event as featured
+      if (!highlightedData.data && events.length > 0) {
+        console.log('📌 Setting first event as featured:', events[0].title);
+        setFeaturedEvent(events[0]);
+        
+        // Extract color from event image
+        if (events[0].image_url || events[0].image) {
+          const imageUrl = getEventImageUrl(events[0].image_url || events[0].image);
+          extractDominantColor(imageUrl);
         }
-        
-        // Get all active events (include highlighted event in regular sections)
-        const allActiveEvents = events;
-        
-        console.log('✅ Active events for sections:', allActiveEvents.length);
-        
-        if (isMounted) {
-          setUpcomingEvents(allActiveEvents);
-        }
-        
-        // Fetch categories with error handling
-        const categoriesResponse = await fetch(`${apiBaseUrl}/categories`);
-        
-        if (!categoriesResponse.ok) {
-          console.error('Categories API error:', categoriesResponse.status, categoriesResponse.statusText);
-          if (isMounted) setCategories([]);
-          return;
-        }
-        
-        const categoriesData = await categoriesResponse.json();
-        console.log('Categories response:', categoriesData);
-        console.log('Categories data structure:', JSON.stringify(categoriesData, null, 2));
-        
-        if (categoriesData.success && isMounted) {
+      }
+      
+      // Get all active events (include highlighted event in regular sections)
+      const allActiveEvents = events;
+      
+      console.log('✅ Active events for sections:', allActiveEvents.length);
+      setUpcomingEvents(allActiveEvents);
+      
+      // Fetch categories with error handling
+      const categoriesResponse = await fetch(`${apiBaseUrl}/categories`);
+      
+      if (!categoriesResponse.ok) {
+        console.error('Categories API error:', categoriesResponse.status, categoriesResponse.statusText);
+        setCategories([]);
+        return;
+      }
+      
+      const categoriesData = await categoriesResponse.json();
+      console.log('Categories response:', categoriesData);
+      console.log('Categories data structure:', JSON.stringify(categoriesData, null, 2));
+      
+      if (categoriesData.success) {
           // API returns: { success: true, data: { categories: [...] } }
           // Try multiple paths to get the categories array
           const cats = categoriesData.data?.categories || categoriesData.data || categoriesData.categories || [];
@@ -221,53 +226,55 @@ const HomePage = () => {
               return true;
             });
             
-            console.log('Final unique active categories:', uniqueCategories.length);
-            console.log('Categories to set:', uniqueCategories);
-            setCategories(uniqueCategories);
-          } else {
-            console.log('No categories array or empty array, cats:', cats);
-            setCategories([]);
-          }
-        } else if (isMounted) {
-          setCategories([]);
-        }
-
-        // Fetch approved reviews from database
-        try {
-          const reviewsResponse = await api.get('/reviews', { params: { limit: 20 } });
-          console.log('Reviews API response:', reviewsResponse);
-          
-          // API uses ApiResponse format: { success, data: { reviews, pagination }, message }
-          const reviewsData = reviewsResponse?.data?.data?.reviews || reviewsResponse?.data?.reviews || [];
-          console.log('Reviews data:', reviewsData);
-          
-          if (isMounted) {
-            setReviews(reviewsData);
-          }
-        } catch (error) {
-          console.error('Error fetching reviews:', error);
-          if (isMounted) {
-            setReviews([]);
-          }
-        }
-        
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        console.log('Final unique active categories:', uniqueCategories.length);
+        console.log('Categories to set:', uniqueCategories);
+        setCategories(uniqueCategories);
+      } else {
+        console.log('No categories array or empty array, cats:', cats);
+        setCategories([]);
       }
-    };
+    } else {
+      setCategories([]);
+    }
 
-    fetchEvents();
+    // Fetch approved reviews from database
+    try {
+      const reviewsResponse = await api.get('/reviews', { params: { limit: 20 } });
+      console.log('Reviews API response:', reviewsResponse);
+      
+      // API uses ApiResponse format: { success, data: { reviews, pagination }, message }
+      const reviewsData = reviewsResponse?.data?.data?.reviews || reviewsResponse?.data?.reviews || [];
+      console.log('Reviews data:', reviewsData);
+      
+      setReviews(reviewsData);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      setReviews([]);
+    }
     
-    // Cleanup function
-    return () => {
-      isMounted = false;
-      hasFetched.current = false; // Reset ref so data can be fetched again on remount
-    };
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Fetch events on mount
+  useEffect(() => {
+    if (!hasFetched.current) {
+      fetchEvents();
+    }
+  }, [fetchEvents]);
+
+  // Update review form when user changes
+  useEffect(() => {
+    if (user && isAuthenticated) {
+      setReviewForm(prev => ({
+        ...prev,
+        full_name: user.full_name || user.username || prev.full_name
+      }));
+    }
+  }, [user, isAuthenticated]);
 
   // Countdown timer for featured event
   useEffect(() => {
@@ -1439,6 +1446,17 @@ const HomePage = () => {
               <p className="font-poppins text-gray-600 text-xl max-w-3xl mx-auto leading-relaxed">
                 Real experiences from our <span className="font-bold text-purple-600">amazing community</span>
               </p>
+              {isAuthenticated && (
+                <motion.button
+                  onClick={() => setShowReviewModal(true)}
+                  className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-poppins font-bold transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Star className="w-5 h-5" />
+                  Tulis Ulasan
+                </motion.button>
+              )}
             </div>
           </FadeInUp>
 
@@ -1507,11 +1525,159 @@ const HomePage = () => {
             <div className="text-center py-16 bg-white rounded-2xl shadow-lg">
               <div className="text-6xl mb-4">💬</div>
               <h3 className="font-bebas text-3xl text-gray-800 mb-2">No Reviews Yet</h3>
-              <p className="font-poppins text-gray-600">Be the first to share your experience!</p>
+              <p className="font-poppins text-gray-600 mb-6">Be the first to share your experience!</p>
+              {isAuthenticated && (
+                <motion.button
+                  onClick={() => setShowReviewModal(true)}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-poppins font-bold transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Star className="w-5 h-5" />
+                  Tulis Ulasan Pertama
+                </motion.button>
+              )}
             </div>
           )}
         </div>
       </section>
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bebas text-3xl text-gray-900">Tulis Ulasan</h3>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!isAuthenticated) {
+                toast.error('Silakan login terlebih dahulu');
+                navigate('/login');
+                return;
+              }
+
+              if (reviewForm.comment.length < 10) {
+                toast.error('Ulasan minimal 10 karakter');
+                return;
+              }
+
+              setSubmittingReview(true);
+              try {
+                await reviewsAPI.create({
+                  rating: reviewForm.rating,
+                  comment: reviewForm.comment,
+                  full_name: reviewForm.full_name || user?.full_name || user?.username
+                });
+                toast.success('Ulasan berhasil dikirim! Menunggu persetujuan admin.');
+                setShowReviewModal(false);
+                setReviewForm({ rating: 5, comment: '', full_name: user?.full_name || '' });
+                // Refresh reviews after a delay (force refresh)
+                setTimeout(() => {
+                  fetchEvents(true);
+                }, 1000);
+              } catch (error) {
+                console.error('Error submitting review:', error);
+                toast.error(error?.message || 'Gagal mengirim ulasan. Silakan coba lagi.');
+              } finally {
+                setSubmittingReview(false);
+              }
+            }}>
+              <div className="space-y-6">
+                {/* Rating */}
+                <div>
+                  <label className="block font-poppins font-semibold text-gray-700 mb-3">
+                    Rating
+                  </label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                        className="transition-transform hover:scale-125"
+                      >
+                        <Star
+                          className={`w-10 h-10 ${
+                            star <= reviewForm.rating
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Full Name */}
+                <div>
+                  <label className="block font-poppins font-semibold text-gray-700 mb-2">
+                    Nama Lengkap
+                  </label>
+                  <input
+                    type="text"
+                    value={reviewForm.full_name}
+                    onChange={(e) => setReviewForm({ ...reviewForm, full_name: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-poppins"
+                    placeholder="Masukkan nama lengkap"
+                    required
+                  />
+                </div>
+
+                {/* Comment */}
+                <div>
+                  <label className="block font-poppins font-semibold text-gray-700 mb-2">
+                    Ulasan
+                  </label>
+                  <textarea
+                    value={reviewForm.comment}
+                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-poppins min-h-[120px]"
+                    placeholder="Bagikan pengalaman Anda..."
+                    required
+                    minLength={10}
+                  />
+                  <p className="text-sm text-gray-500 mt-2">
+                    {reviewForm.comment.length}/10 karakter minimum
+                  </p>
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewModal(false)}
+                    className="flex-1 px-6 py-3 border border-gray-300 rounded-xl font-poppins font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingReview || reviewForm.comment.length < 10}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-xl font-poppins font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                  >
+                    {submittingReview ? 'Mengirim...' : 'Kirim Ulasan'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
 
       {/* Mobile App Preview Section */}
       <section className="py-32 bg-gradient-to-br from-purple-900 via-purple-800 to-black relative overflow-hidden">

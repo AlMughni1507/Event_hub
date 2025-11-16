@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../../contexts/ToastContext';
-import { Star, CheckCircle, XCircle, Trash2, MessageSquare, User, Calendar, Filter } from 'lucide-react';
+import { Star, CheckCircle, XCircle, Trash2, MessageSquare, User, Calendar, Filter, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 import ConfirmModal from '../../components/ConfirmModal';
 
@@ -11,10 +12,51 @@ const ReviewsManagement = () => {
   const [filter, setFilter] = useState('all'); // all, pending, approved
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null });
   const [statusConfirm, setStatusConfirm] = useState({ show: false, review: null, action: null });
+  const [newReviewCount, setNewReviewCount] = useState(0);
+  const [animatedReviews, setAnimatedReviews] = useState(new Set());
+  const previousReviewsRef = useRef([]);
+  const autoRefreshIntervalRef = useRef(null);
 
   useEffect(() => {
     fetchReviews();
+    
+    // Auto-refresh every 30 seconds to check for new reviews
+    autoRefreshIntervalRef.current = setInterval(() => {
+      fetchReviews();
+    }, 30000);
+
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
   }, [filter]);
+
+  // Detect new reviews and trigger animations
+  useEffect(() => {
+    if (reviews.length > 0 && previousReviewsRef.current.length > 0) {
+      const newReviews = reviews.filter(
+        review => !previousReviewsRef.current.some(prev => prev.id === review.id)
+      );
+      
+      if (newReviews.length > 0) {
+        setNewReviewCount(prev => prev + newReviews.length);
+        // Add new reviews to animated set
+        newReviews.forEach(review => {
+          setAnimatedReviews(prev => new Set([...prev, review.id]));
+          // Remove from animated set after animation completes
+          setTimeout(() => {
+            setAnimatedReviews(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(review.id);
+              return newSet;
+            });
+          }, 2000);
+        });
+      }
+    }
+    previousReviewsRef.current = reviews;
+  }, [reviews]);
 
   const fetchReviews = async () => {
     try {
@@ -37,6 +79,17 @@ const ReviewsManagement = () => {
         is_approved: isApproved
       });
       toast.success(isApproved ? 'Ulasan disetujui!' : 'Ulasan ditolak!');
+      
+      // Trigger animation for updated review
+      setAnimatedReviews(prev => new Set([...prev, reviewId]));
+      setTimeout(() => {
+        setAnimatedReviews(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(reviewId);
+          return newSet;
+        });
+      }, 2000);
+      
       fetchReviews();
     } catch (error) {
       toast.error('Gagal mengupdate status ulasan');
@@ -111,6 +164,16 @@ const ReviewsManagement = () => {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <MessageSquare className="w-8 h-8 text-purple-600" />
               Manajemen Ulasan
+              {newReviewCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: [0, 1.2, 1] }}
+                  className="bg-red-500 text-white text-sm font-bold px-3 py-1 rounded-full flex items-center gap-1"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {newReviewCount} Baru
+                </motion.span>
+              )}
             </h1>
             <p className="text-gray-600 mt-1">Kelola ulasan platform dari pengguna</p>
           </div>
@@ -225,11 +288,69 @@ const ReviewsManagement = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {reviews.map((review) => (
-            <div
-              key={review.id}
-              className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all"
-            >
+          <AnimatePresence>
+            {reviews.map((review, index) => {
+              const isNew = animatedReviews.has(review.id);
+              return (
+              <motion.div
+                key={review.id}
+                initial={isNew ? { opacity: 0, scale: 0.8, y: -20 } : { opacity: 0, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                transition={{ 
+                  duration: 0.5,
+                  delay: isNew ? 0 : index * 0.05,
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 25
+                }}
+                className={`bg-white rounded-2xl p-6 shadow-sm border-2 transition-all relative overflow-hidden ${
+                  isNew 
+                    ? 'border-green-400 shadow-green-200 shadow-lg' 
+                    : 'border-gray-200 hover:shadow-md'
+                }`}
+              >
+                {/* New Review Indicator */}
+                {isNew && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0 }}
+                    className="absolute top-4 right-4 z-10"
+                  >
+                    <motion.div
+                      animate={{ 
+                        scale: [1, 1.2, 1],
+                        rotate: [0, 10, -10, 0]
+                      }}
+                      transition={{ 
+                        duration: 0.6,
+                        repeat: Infinity,
+                        repeatDelay: 1
+                      }}
+                      className="bg-gradient-to-r from-green-400 to-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Baru
+                    </motion.div>
+                  </motion.div>
+                )}
+
+                {/* Pulsing glow effect for new reviews */}
+                {isNew && (
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-green-400/20 to-emerald-400/20 rounded-2xl pointer-events-none"
+                    animate={{ 
+                      opacity: [0.3, 0.6, 0.3]
+                    }}
+                    transition={{ 
+                      duration: 1.5,
+                      repeat: Infinity
+                    }}
+                  />
+                )}
+                
+                <div className="relative z-10">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-4 flex-1">
                   <img
@@ -275,33 +396,42 @@ const ReviewsManagement = () => {
 
               <div className="flex items-center gap-2">
                 {!review.is_approved && (
-                  <button
+                  <motion.button
                     onClick={() => setStatusConfirm({ show: true, review, action: 'approve' })}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-md"
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all shadow-md"
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
                   >
                     <CheckCircle className="w-4 h-4" />
                     Setujui
-                  </button>
+                  </motion.button>
                 )}
                 {review.is_approved && (
-                  <button
+                  <motion.button
                     onClick={() => setStatusConfirm({ show: true, review, action: 'reject' })}
-                    className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-md"
+                    className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-semibold transition-all shadow-md"
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
                   >
                     <XCircle className="w-4 h-4" />
                     Tolak
-                  </button>
+                  </motion.button>
                 )}
-                <button
+                <motion.button
                   onClick={() => setDeleteConfirm({ show: true, id: review.id })}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-md ml-auto"
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all shadow-md ml-auto"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <Trash2 className="w-4 h-4" />
                   Hapus
-                </button>
+                </motion.button>
               </div>
-            </div>
-          ))}
+                </div>
+            </motion.div>
+            );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
