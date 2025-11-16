@@ -547,18 +547,17 @@ router.get('/export/participants/:eventId', async (req, res) => {
       return ApiResponse.notFound(res, 'Event not found');
     }
 
-    // Get participants data from event_registrations (main table with all data)
+    // Get participants data from event_registrations
+    // event_registrations table doesn't have full_name, email, phone, address, city, province, institution - get from users table
     const [participants] = await query(`
       SELECT 
         er.id,
         er.user_id,
-        COALESCE(er.full_name, u.full_name) as full_name,
-        COALESCE(er.email, u.email) as email,
-        COALESCE(er.phone, u.phone) as phone,
-        er.address,
-        er.city,
-        er.province,
-        er.institution,
+        u.full_name as full_name,
+        u.email as email,
+        u.phone as phone,
+        u.address,
+        u.education,
         er.notes,
         er.status,
         er.payment_status,
@@ -578,9 +577,7 @@ router.get('/export/participants/:eventId', async (req, res) => {
       'Email': participant.email || '-',
       'No. Telepon': participant.phone || '-',
       'Alamat': participant.address || '-',
-      'Kota': participant.city || '-',
-      'Provinsi': participant.province || '-',
-      'Institusi': participant.institution || '-',
+      'Pendidikan': participant.education || '-',
       'Catatan': participant.notes || '-',
       'Status Pendaftaran': participant.status || 'pending',
       'Status Pembayaran': participant.payment_status || 'Belum Dibayar',

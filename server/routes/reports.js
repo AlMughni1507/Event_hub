@@ -142,11 +142,12 @@ router.get('/summary', async (req, res) => {
     );
 
     // Participant details
+    // event_registrations table doesn't have full_name, email, phone - get from users table
     const [participantDetails] = await query(
       `SELECT 
-          COALESCE(er.full_name, u.full_name) as name, 
-          COALESCE(er.email, u.email) as email, 
-          COALESCE(er.phone, u.phone) as phone,
+          u.full_name as name, 
+          u.email as email, 
+          u.phone as phone,
           e.title as event_title,
           er.status, 
           er.created_at as registration_date
