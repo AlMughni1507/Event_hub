@@ -5,7 +5,7 @@ nixPkgs = ['nodejs-18_x']
 cmds = ['npm ci']
 
 [phases.build]
-cmds = ['npm run migrate || true']
+cmds = ['echo "Build complete"']
 
 [start]
 cmd = 'node server.js'
