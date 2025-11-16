@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-require('dotenv').config({ path: './config.env' });
+require('dotenv').config();
 const { initCronJobs } = require('./utils/cronJobs');
 const { archiveEndedEvents } = require('./utils/eventCleanup');
 const { runMigrations } = require('./migrations/runMigration');
@@ -13,8 +13,11 @@ const app = express();
 // Trust proxy for Railway/Vercel (important for rate limiting and IP detection)
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
+// Security middleware with relaxed CSP for production
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP to allow inline scripts from Vite
+  crossOriginEmbedderPolicy: false
+}));
 // CORS configuration - allow frontend domains
 const allowedOrigins = [
   'http://localhost:5173',
@@ -82,6 +85,41 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Database connection test endpoint
+app.get('/api/db-test', async (req, res) => {
+  const { promisePool } = require('./db');
+  try {
+    const [result] = await promisePool.query('SELECT DATABASE() as db_name, USER() as db_user, @@hostname as db_host');
+    const [tables] = await promisePool.query('SHOW TABLES');
+    
+    res.json({
+      success: true,
+      message: 'Database connection successful',
+      connection: {
+        database: result[0].db_name,
+        user: result[0].db_user,
+        host: result[0].db_host,
+        configured_host: process.env.DB_HOST,
+        configured_db: process.env.DB_NAME,
+        configured_port: process.env.DB_PORT
+      },
+      tables: tables.map(t => Object.values(t)[0]),
+      table_count: tables.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Database connection failed',
+      error: error.message,
+      config: {
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        port: process.env.DB_PORT
+      }
+    });
+  }
+});
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
@@ -126,11 +164,26 @@ app.use('/api/admin/reports', reportsRoutes);
 
 console.log('✅ Reports routes registered at /api/admin/reports');
 
-// 404 handler
-app.use('*', (req, res) => {
+// Serve static files from frontend build (for production)
+if (process.env.NODE_ENV === 'production') {
+  const frontendBuildPath = path.join(__dirname, '../frontend/dist');
+  app.use(express.static(frontendBuildPath));
+  
+  // Serve index.html for all non-API routes (SPA support)
+  app.get('*', (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendBuildPath, 'index.html'));
+  });
+}
+
+// 404 handler for API routes only
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: 'API route not found'
   });
 });
 
