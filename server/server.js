@@ -12,15 +12,33 @@ const app = express();
 
 // Security middleware
 app.use(helmet());
+// CORS configuration - allow frontend domains
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+  // Add your Vercel frontend domain here
+  process.env.FRONTEND_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+].filter(Boolean);
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5174'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow all origins in development, or check against allowed list
+    if (process.env.NODE_ENV === 'development' || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // In production, you might want to be more strict
+      // For now, allow all origins for easier deployment
+      callback(null, true);
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type', 
     'Authorization', 
@@ -125,33 +143,36 @@ app.use((error, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, async () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  
-  console.log('✅ All routes registered successfully\n');
-  
-  // Run database migrations first
-  console.log('🔄 Running database migrations...');
-  try {
-    await runMigrations();
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
-  }
-  
-  // Run initial cleanup on server start
-  console.log('🧹 Running initial event archival...');
-  try {
-    const result = await archiveEndedEvents();
-    console.log(`✅ Initial archival complete: ${result.archived} events archived`);
-  } catch (error) {
-    console.error('❌ Initial archival failed:', error);
-  }
-  
-  // Initialize cron jobs for automatic archival
-  initCronJobs();
-});
+// Only start server if not in Vercel serverless environment
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, async () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    
+    console.log('✅ All routes registered successfully\n');
+    
+    // Run database migrations first
+    console.log('🔄 Running database migrations...');
+    try {
+      await runMigrations();
+    } catch (error) {
+      console.error('❌ Migration failed:', error);
+    }
+    
+    // Run initial cleanup on server start
+    console.log('🧹 Running initial event archival...');
+    try {
+      const result = await archiveEndedEvents();
+      console.log(`✅ Initial archival complete: ${result.archived} events archived`);
+    } catch (error) {
+      console.error('❌ Initial archival failed:', error);
+    }
+    
+    // Initialize cron jobs for automatic archival
+    initCronJobs();
+  });
+}
 
 module.exports = app;
 
