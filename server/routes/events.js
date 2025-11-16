@@ -99,7 +99,7 @@ router.get('/', async (req, res) => {
     // Get events with category info and registration count
     const [events] = await query(
       `SELECT e.*, c.name as category_name, e.image as image_url,
-              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations,
+              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as approved_registrations,
               CASE 
                 WHEN e.event_date < NOW() THEN 'past'
                 WHEN e.event_date > NOW() THEN 'upcoming'

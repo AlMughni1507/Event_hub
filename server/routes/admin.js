@@ -631,7 +631,7 @@ router.get('/export/events', async (req, res) => {
         e.status,
         c.name as category_name,
         (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id) as total_registrations,
-        (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as confirmed_registrations,
+        (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as confirmed_registrations,
         e.created_at
       FROM events e
       LEFT JOIN categories c ON e.category_id = c.id

@@ -231,7 +231,7 @@ router.post('/notification', async (req, res) => {
     if (paymentStatus === 'success') {
       // Update event_registrations
       await query(
-        'UPDATE event_registrations SET status = "confirmed", payment_status = "paid", updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        'UPDATE event_registrations SET status = "approved", payment_status = "paid", updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [payment.registration_id]
       );
 
