@@ -3,18 +3,18 @@ nixPkgs = ['nodejs-18_x']
 
 [phases.install]
 cmds = [
-  'cd ..',
   'npm ci',
-  'cd server',
-  'npm ci'
+  'cd ../frontend && npm ci',
+  'cd ../server'
 ]
 
 [phases.build]
 cmds = [
-  'cd ..',
-  'npm run build',
-  'cd server',
-  'echo "Build complete"'
+  'cd ../frontend && npm run build',
+  'cd ../server',
+  'mkdir -p dist',
+  'cp -r ../frontend/dist/* dist/',
+  'echo "Frontend copied to server/dist"'
 ]
 
 [start]

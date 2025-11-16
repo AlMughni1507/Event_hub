@@ -166,7 +166,7 @@ console.log('✅ Reports routes registered at /api/admin/reports');
 
 // Serve static files from frontend build (for production)
 if (process.env.NODE_ENV === 'production') {
-  const frontendBuildPath = path.join(__dirname, '../frontend/dist');
+  const frontendBuildPath = path.join(__dirname, 'dist');
   app.use(express.static(frontendBuildPath));
   
   // Serve index.html for all non-API routes (SPA support)
