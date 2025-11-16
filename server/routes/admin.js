@@ -282,7 +282,7 @@ router.get('/registrations', async (req, res) => {
     );
 
     // Get registrations with event and user info
-    // Try to use columns from event_registrations first, fallback to users/registrations tables
+    // Use event_registrations table (main table) with fallback to users table
     const [registrations] = await query(
       `SELECT r.*, 
               e.title as event_title, 
@@ -293,19 +293,18 @@ router.get('/registrations', async (req, res) => {
               u.full_name as user_name, 
               u.email as user_email,
               u.phone as user_phone,
-              -- Use event_registrations columns if they exist, otherwise use registrations table, then users
-              COALESCE(r.full_name, reg.full_name, u.full_name) as full_name,
-              COALESCE(r.email, reg.email, u.email) as email,
-              COALESCE(r.phone, reg.phone, u.phone) as phone,
-              COALESCE(r.address, reg.address) as address,
-              COALESCE(r.city, reg.city) as city,
-              COALESCE(r.province, reg.province) as province,
-              COALESCE(r.institution, reg.institution) as institution,
-              COALESCE(r.notes, reg.notes) as notes
+              -- Use event_registrations columns if they exist, otherwise use users table
+              COALESCE(r.full_name, u.full_name) as full_name,
+              COALESCE(r.email, u.email) as email,
+              COALESCE(r.phone, u.phone) as phone,
+              r.address,
+              r.city,
+              r.province,
+              r.institution,
+              r.notes
        FROM event_registrations r
        LEFT JOIN events e ON r.event_id = e.id
        LEFT JOIN users u ON r.user_id = u.id
-       LEFT JOIN registrations reg ON r.user_id = reg.user_id AND r.event_id = reg.event_id
        ${whereClause}
        ORDER BY COALESCE(r.created_at, r.id) DESC 
        LIMIT ? OFFSET ?`,
