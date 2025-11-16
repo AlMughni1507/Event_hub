@@ -41,9 +41,13 @@ const RegistrationsManagement = () => {
                                 response?.data ||
                                 [];
       setRegistrations(Array.isArray(registrationsData) ? registrationsData : []);
+      console.log('✅ Registrations loaded:', registrationsData.length);
     } catch (error) {
-      console.error('Error fetching registrations:', error);
-      toast.error('Gagal memuat data registrations');
+      console.error('❌ Error fetching registrations:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      const errorMessage = error.response?.data?.message || error.message || 'Gagal memuat data registrations';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
