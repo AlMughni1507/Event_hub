@@ -374,7 +374,7 @@ router.post('/verify/:orderId', authenticateToken, requireUser, async (req, res)
     // Update registration if payment successful
     if (paymentStatus === 'success') {
       await query(
-        'UPDATE event_registrations SET status = "confirmed", payment_status = "paid" WHERE id = ?',
+        'UPDATE event_registrations SET status = "approved", payment_status = "paid" WHERE id = ?',
         [payment.registration_id]
       );
     }
