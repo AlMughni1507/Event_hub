@@ -259,7 +259,7 @@ router.get('/events', async (req, res) => {
 // Get all registrations
 router.get('/registrations', async (req, res) => {
   try {
-    const { page = 1, limit = 10, event_id = '', status = '' } = req.query;
+    const { page = 1, limit = 10, event_id = '', status = '', search = '' } = req.query;
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE 1=1';
@@ -275,14 +275,25 @@ router.get('/registrations', async (req, res) => {
       params.push(status);
     }
 
-    // Get total count
+    // Search by user name or email
+    if (search) {
+      whereClause += ' AND (u.full_name LIKE ? OR u.email LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    // Get total count - need to join users table for search
     const [countResult] = await query(
-      `SELECT COUNT(*) as total FROM event_registrations r ${whereClause}`,
+      `SELECT COUNT(*) as total 
+       FROM event_registrations r
+       LEFT JOIN users u ON r.user_id = u.id
+       ${whereClause}`,
       params
     );
 
     // Get registrations with event and user info
     // event_registrations table doesn't have full_name, email, phone - get from users table
+    // users table only has: id, username, email, password, full_name, phone, role, avatar, is_active, address, education
+    // users table does NOT have: city, province, institution
     const [registrations] = await query(
       `SELECT r.*, 
               e.title as event_title, 
@@ -297,9 +308,7 @@ router.get('/registrations', async (req, res) => {
               u.email as email,
               u.phone as phone,
               u.address,
-              u.city,
-              u.province,
-              u.institution,
+              u.education,
               r.notes
        FROM event_registrations r
        LEFT JOIN events e ON r.event_id = e.id
