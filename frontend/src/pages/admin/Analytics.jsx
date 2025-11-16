@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, ClipboardList, FolderKanban, Activity, Calendar, Target, Rocket, BarChart3, Zap, Trophy } from 'lucide-react';
-import { eventsAPI, usersAPI, registrationsAPI, categoriesAPI } from '../../services/api';
+import { adminAPI, categoriesAPI, analyticsAPI } from '../../services/api';
 
 const Analytics = () => {
   const [analytics, setAnalytics] = useState({
@@ -24,17 +24,26 @@ const Analytics = () => {
     try {
       setLoading(true);
       
-      const [eventsRes, usersRes, registrationsRes, categoriesRes] = await Promise.all([
-        eventsAPI.getAll(),
-        usersAPI.getAll(),
-        registrationsAPI.getAll(),
-        categoriesAPI.getAll()
+      // Use adminAPI for consistent data with Dashboard
+      const [eventsRes, usersRes, registrationsRes, categoriesRes, topEventsRes] = await Promise.all([
+        adminAPI.getAllEvents({ limit: 1000 }),
+        adminAPI.getAllUsers({ limit: 10000 }),
+        adminAPI.getAllRegistrations({ limit: 10000 }),
+        categoriesAPI.getAll(),
+        analyticsAPI.getTopEvents()
       ]);
 
-      const events = eventsRes.data.events || [];
-      const users = usersRes.data.users || [];
-      const registrations = registrationsRes.data.registrations || [];
-      const categories = categoriesRes.data.categories || [];
+      const eventsData = eventsRes?.data || eventsRes || {};
+      const usersData = usersRes?.data || usersRes || {};
+      const registrationsData = registrationsRes?.data || registrationsRes || {};
+      const categoriesData = categoriesRes?.data || categoriesRes || {};
+      const topEventsData = topEventsRes?.data || topEventsRes || {};
+
+      const events = eventsData.events || [];
+      const users = usersData.users || [];
+      const registrations = registrationsData.registrations || [];
+      const categories = categoriesData.categories || [];
+      const topEvents = topEventsData.topEvents || [];
 
       // Calculate analytics
       const eventsByCategory = categories.map(category => ({
@@ -43,21 +52,32 @@ const Analytics = () => {
         color: category.color || '#007bff'
       }));
 
-      const topEvents = events
-        .map(event => ({
-          ...event,
-          registrationCount: registrations.filter(reg => reg.event_id === event.id).length
-        }))
-        .sort((a, b) => b.registrationCount - a.registrationCount)
-        .slice(0, 5);
+      // Use topEvents from API, or calculate from registrations if not available
+      const topEventsList = topEvents.length > 0 
+        ? topEvents.slice(0, 5).map(event => ({
+            ...event,
+            registrationCount: event.participant_count || 0
+          }))
+        : events
+            .map(event => ({
+              ...event,
+              registrationCount: registrations.filter(reg => reg.event_id === event.id).length
+            }))
+            .sort((a, b) => b.registrationCount - a.registrationCount)
+            .slice(0, 5);
+
+      // Use pagination totals for accurate counts
+      const totalEvents = eventsData.pagination?.total || events.length;
+      const totalUsers = usersData.pagination?.total || users.length;
+      const totalRegistrations = registrationsData.pagination?.total || registrations.length;
 
       setAnalytics({
-        totalEvents: events.length,
-        totalUsers: users.length,
-        totalRegistrations: registrations.length,
+        totalEvents,
+        totalUsers,
+        totalRegistrations,
         totalCategories: categories.length,
         eventsByCategory,
-        topEvents,
+        topEvents: topEventsList,
         recentActivity: registrations.slice(0, 10)
       });
     } catch (error) {
@@ -223,8 +243,8 @@ const Analytics = () => {
               </div>
               <div className="flex-1">
                 <p className="text-black">
-                  <span className="font-medium">{activity.user_name || activity.full_name}</span> registered for{' '}
-                  <span className="font-medium text-blue-600">{activity.event_title}</span>
+                  <span className="font-medium">{activity.full_name || activity.user_name || 'User'}</span> registered for{' '}
+                  <span className="font-medium text-blue-600">{activity.event_title || 'Event'}</span>
                 </p>
                 <p className="text-gray-600 text-sm">
                   {new Date(activity.created_at).toLocaleDateString('id-ID', {

@@ -179,7 +179,7 @@ router.get('/monthly-events', authenticateToken, requireAdmin, async (req, res) 
   }
 });
 
-// Get monthly participants statistics (from attendance records)
+// Get monthly participants statistics (from event_registrations table)
 router.get('/monthly-participants', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { year = new Date().getFullYear() } = req.query;
@@ -188,13 +188,12 @@ router.get('/monthly-participants', authenticateToken, requireAdmin, async (req,
       SELECT 
         MONTH(e.event_date) as month,
         MONTHNAME(e.event_date) as month_name,
-        COUNT(r.id) as total_participants
+        COUNT(er.id) as total_participants
       FROM events e
-      LEFT JOIN registrations r ON e.id = r.event_id 
+      LEFT JOIN event_registrations er ON e.id = er.event_id 
+        AND er.status = 'approved'
       WHERE YEAR(e.event_date) = ? 
         AND e.status = 'published'
-        AND r.status = 'approved'
-        AND r.attendance_status = 'present'
       GROUP BY MONTH(e.event_date), MONTHNAME(e.event_date)
       ORDER BY MONTH(e.event_date)
     `, [year]);
@@ -222,7 +221,7 @@ router.get('/monthly-participants', authenticateToken, requireAdmin, async (req,
   }
 });
 
-// Get top 10 events by participant count
+// Get top 10 events by participant count (from event_registrations table)
 router.get('/top-events', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const topEvents = await query(`
@@ -231,11 +230,10 @@ router.get('/top-events', authenticateToken, requireAdmin, async (req, res) => {
         e.title,
         e.event_date,
         c.name as category_name,
-        COUNT(r.id) as participant_count
+        COUNT(er.id) as participant_count
       FROM events e
-      LEFT JOIN registrations r ON e.id = r.event_id 
-        AND r.status = 'approved' 
-        AND r.attendance_status = 'present'
+      LEFT JOIN event_registrations er ON e.id = er.event_id 
+        AND er.status = 'approved'
       LEFT JOIN categories c ON e.category_id = c.id
       WHERE e.status = 'published'
       GROUP BY e.id, e.title, e.event_date, c.name
