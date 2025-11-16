@@ -211,6 +211,18 @@ if (process.env.NODE_ENV === 'production') {
   const frontendBuildPath = path.join(__dirname, 'dist');
   console.log('📁 Serving static files from:', frontendBuildPath);
   
+  // Check if dist folder exists and has content
+  const fs = require('fs');
+  if (fs.existsSync(frontendBuildPath)) {
+    const files = fs.readdirSync(frontendBuildPath);
+    console.log('📄 Dist folder contains:', files.length, 'items');
+    if (files.length === 0 || (files.length === 1 && files[0] === '.gitkeep')) {
+      console.warn('⚠️  Dist folder is empty or only contains .gitkeep');
+    }
+  } else {
+    console.error('❌ Dist folder does not exist:', frontendBuildPath);
+  }
+  
   // Log when static files are requested
   app.use((req, res, next) => {
     if (req.path.startsWith('/assets/') || req.path.endsWith('.js') || req.path.endsWith('.css')) {
@@ -238,7 +250,15 @@ if (process.env.NODE_ENV === 'production') {
       return next();
     }
     console.log('🏠 SPA route:', req.path);
-    res.sendFile(path.join(frontendBuildPath, 'index.html'));
+    
+    // Check if index.html exists
+    const indexPath = path.join(frontendBuildPath, 'index.html');
+    if (!fs.existsSync(indexPath)) {
+      console.error('❌ index.html not found at:', indexPath);
+      return res.status(404).send('Frontend build not found');
+    }
+    
+    res.sendFile(indexPath);
   });
 }
 
