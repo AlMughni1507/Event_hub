@@ -2,11 +2,21 @@
 nixPkgs = ['nodejs-18_x']
 
 [phases.install]
-cmds = ['npm ci']
+cmds = [
+  'cd ..',
+  'npm ci',
+  'cd server',
+  'npm ci'
+]
 
 [phases.build]
-cmds = ['echo "Build complete"']
+cmds = [
+  'cd ..',
+  'npm run build',
+  'cd server',
+  'echo "Build complete"'
+]
 
 [start]
-cmd = 'node server.js'
+cmd = 'NODE_ENV=production node server.js'
 
