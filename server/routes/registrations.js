@@ -112,19 +112,53 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
       notes
     } = req.body;
 
-    // Check if event exists and is active
+    // Check if event exists and is active, and has required fields
     const [events] = await query(
-      'SELECT * FROM events WHERE id = ? AND is_active = 1',
+      'SELECT * FROM events WHERE id = ? AND is_active = 1 AND event_date IS NOT NULL',
       [event_id]
     );
 
     if (events.length === 0) {
-      console.log('❌ Event not found:', event_id);
-      return ApiResponse.notFound(res, 'Event not found or inactive');
+      console.log('❌ Event not found or missing event_date:', event_id);
+      return ApiResponse.notFound(res, 'Event not found, inactive, or missing required information. Please contact admin.');
     }
 
     const event = events[0];
     console.log('✅ Event found:', event.title);
+    console.log('📅 Event date (raw):', event.event_date);
+    console.log('📅 Event date (type):', typeof event.event_date);
+    console.log('⏰ Event time (raw):', event.event_time);
+    console.log('⏰ Event time (type):', typeof event.event_time);
+
+    // Validate and sanitize payment_method (max 20 chars to be safe)
+    // For free events, use 'free', otherwise use 'cash' or provided method
+    const isFreeEvent = event.is_free === 1 || parseFloat(event.price || 0) === 0;
+    let sanitizedPaymentMethod = isFreeEvent ? 'free' : 'cash';
+    
+    if (payment_method) {
+      const validMethods = ['cash', 'free', 'midtrans', 'bank_transfer', 'credit_card'];
+      const methodStr = String(payment_method).trim().toLowerCase();
+      
+      // Truncate to max 20 chars to be safe (some databases might have smaller limits)
+      const truncatedMethod = methodStr.substring(0, 20);
+      
+      if (validMethods.includes(truncatedMethod)) {
+        sanitizedPaymentMethod = truncatedMethod;
+      } else if (truncatedMethod.length > 0) {
+        // If not in valid list but has value, use it but truncate
+        sanitizedPaymentMethod = truncatedMethod;
+      }
+    }
+    
+    // Final safety: ensure it's not empty and max 20 chars
+    sanitizedPaymentMethod = (sanitizedPaymentMethod || 'cash').substring(0, 20);
+    
+    console.log('💳 Payment method:', { 
+      original: payment_method, 
+      sanitized: sanitizedPaymentMethod,
+      length: sanitizedPaymentMethod.length,
+      isFreeEvent: isFreeEvent
+    });
 
     // Check if event registration is still open (event hasn't started yet)
     const now = new Date();
@@ -132,11 +166,28 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     // Safely parse event date and time
     let eventDateTime;
     try {
-      const eventDateStr = event.event_date ? event.event_date.toString().split('T')[0] : null;
+      // Handle different date formats from database
+      let eventDateStr = null;
+      if (event.event_date) {
+        if (event.event_date instanceof Date) {
+          eventDateStr = event.event_date.toISOString().split('T')[0];
+        } else if (typeof event.event_date === 'string') {
+          // Handle string dates (YYYY-MM-DD or other formats)
+          eventDateStr = event.event_date.split('T')[0].split(' ')[0];
+        } else {
+          // Try to convert to string first
+          eventDateStr = String(event.event_date).split('T')[0].split(' ')[0];
+        }
+      }
+      
       const eventTimeStr = event.event_time ? event.event_time.toString() : '00:00:00';
       
-      if (!eventDateStr) {
-        return ApiResponse.badRequest(res, 'Event date is required');
+      console.log('📅 Parsed event date string:', eventDateStr);
+      console.log('⏰ Parsed event time string:', eventTimeStr);
+      
+      if (!eventDateStr || eventDateStr === 'null' || eventDateStr === 'undefined' || eventDateStr.trim() === '') {
+        console.error('❌ Event date is missing or invalid:', event.event_date);
+        return ApiResponse.badRequest(res, 'Event date is required. Please contact admin to update event details.');
       }
       
       // Parse date and time safely
@@ -187,7 +238,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     // Check if event is full
     if (event.max_participants) {
       const [approvedRegistrations] = await query(
-        'SELECT COUNT(*) as count FROM event_registrations WHERE event_id = ? AND status = "confirmed"',
+        'SELECT COUNT(*) as count FROM event_registrations WHERE event_id = ? AND status = "approved"',
         [event_id]
       );
 
@@ -206,7 +257,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     const registrantProvince = (province || req.user.province || '').trim();
     const registrantInstitution = (institution || req.user.institution || '').trim();
     
-    const isFreeEvent = event.is_free === 1 || parseFloat(event.price || 0) === 0;
+    // isFreeEvent already calculated above
     
     // Validate required fields for free events
     if (isFreeEvent) {
@@ -218,7 +269,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
       }
     }
 
-    const registrationStatus = isFreeEvent ? 'confirmed' : 'pending';
+    const registrationStatus = isFreeEvent ? 'approved' : 'pending';
     const paymentStatus = isFreeEvent ? 'paid' : 'pending';
     const paymentAmount = parseFloat(event.price || 0);
 
@@ -305,7 +356,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
           registrantCity,
           registrantProvince,
           registrantInstitution,
-          payment_method,
+          sanitizedPaymentMethod,
           registrationStatus,
           paymentStatus,
           paymentAmount,
@@ -341,7 +392,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
           registrantCity,
           registrantProvince,
           registrantInstitution,
-          payment_method,
+          sanitizedPaymentMethod,
           paymentAmount,
           paymentStatus,
           registrationStatus,
@@ -357,19 +408,37 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
         console.warn('⚠️ Full fields not available, trying minimal fields...');
         try {
           // Insert with only basic fields that should exist (without attendance columns)
-          [eventInsert] = await query(
-            `INSERT INTO event_registrations
-             (user_id, event_id, payment_method, payment_amount, payment_status, status) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [
-              req.user.id,
-              event_id,
-              payment_method,
-              paymentAmount,
-              paymentStatus,
-              registrationStatus
-            ]
-          );
+          // Try with payment_method first, if fails try without it
+          try {
+            [eventInsert] = await query(
+              `INSERT INTO event_registrations
+               (user_id, event_id, payment_method, payment_amount, payment_status, status) 
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [
+                req.user.id,
+                event_id,
+                sanitizedPaymentMethod,
+                paymentAmount,
+                paymentStatus,
+                registrationStatus
+              ]
+            );
+          } catch (paymentMethodError) {
+            // If payment_method causes error, try without it
+            console.warn('⚠️ Payment method error, trying without payment_method:', paymentMethodError.message);
+            [eventInsert] = await query(
+              `INSERT INTO event_registrations
+               (user_id, event_id, payment_amount, payment_status, status) 
+               VALUES (?, ?, ?, ?, ?)`,
+              [
+                req.user.id,
+                event_id,
+                paymentAmount,
+                paymentStatus,
+                registrationStatus
+              ]
+            );
+          }
           eventRegistrationId = eventInsert.insertId;
           console.log('✅ Event registration created with minimal fields:', eventRegistrationId);
         } catch (minimalError) {
@@ -384,7 +453,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
 
     let tokenData = null;
 
-    if (registrationStatus === 'confirmed') {
+    if (registrationStatus === 'approved') {
       // Generate attendance token
       console.log('🔑 Generating token...');
       tokenData = await TokenService.createAttendanceToken(
@@ -427,7 +496,7 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
       ...registrations[0],
       token: tokenData?.token || null,
       tokenExpiresAt: tokenData?.expiresAt || null
-    }, registrationStatus === 'confirmed'
+    }, registrationStatus === 'approved'
       ? 'Registration created successfully. Attendance token has been sent to your email.'
       : 'Registration created successfully. Silakan selesaikan pembayaran untuk menerima token kehadiran.'
     );

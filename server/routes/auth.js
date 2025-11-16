@@ -79,15 +79,11 @@ router.post('/register', validateUserRegistration, handleValidationErrors, async
 
     console.log(`📧 Email normalization: ${email} → ${finalEmail}`);
 
-    // Validate password complexity
-    // Must contain: min 8 chars, uppercase, lowercase, number, special character
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
-    
-    if (!passwordRegex.test(password)) {
+    // Simple password validation - minimal 6 karakter
+    if (!password || password.length < 6) {
       return ApiResponse.badRequest(
         res,
-        'Password harus minimal 8 karakter dan mengandung: huruf besar, huruf kecil, angka, dan karakter spesial (@$!%*?&#). ' +
-        'Contoh: Password123#'
+        'Password minimal 6 karakter'
       );
     }
 
@@ -141,8 +137,22 @@ router.post('/register', validateUserRegistration, handleValidationErrors, async
     const emailSent = await emailService.sendOTPEmail(finalEmail, otpCode, full_name);
     
     if (!emailSent.success) {
-      console.error('❌ Failed to send OTP email:', emailSent.message);
-      return ApiResponse.error(res, 'Failed to send verification email. Please try again.');
+      console.error('❌ Failed to send OTP email:', emailSent.message || emailSent.error);
+      console.error('   Details:', emailSent.details);
+      
+      // Return OTP code in development mode if email fails
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ DEVELOPMENT MODE: Returning OTP in response');
+        return ApiResponse.created(res, {
+          userId,
+          email: finalEmail,
+          originalEmail: email,
+          otpCode: otpCode, // Include OTP in dev mode
+          message: 'Registration successful! OTP sent (check console for email errors). OTP: ' + otpCode
+        }, 'Registration successful! Please verify your email to activate your account.');
+      }
+      
+      return ApiResponse.error(res, emailSent.message || emailSent.error || 'Failed to send verification email. Please check your SMTP configuration.');
     }
 
     console.log(`✅ OTP email sent successfully to ${finalEmail}`);
@@ -540,7 +550,19 @@ router.post('/resend-otp', async (req, res) => {
     const emailSent = await emailService.sendOTPEmail(email, otpCode, user.full_name);
     
     if (!emailSent.success) {
-      return ApiResponse.error(res, 'Failed to send verification email');
+      console.error('❌ Failed to resend OTP email:', emailSent.message || emailSent.error);
+      console.error('   Details:', emailSent.details);
+      
+      // Return OTP code in development mode if email fails
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ DEVELOPMENT MODE: Returning OTP in response');
+        return ApiResponse.success(res, {
+          otpCode: otpCode,
+          message: 'OTP generated (check console for email errors). OTP: ' + otpCode
+        }, 'New verification code generated. OTP: ' + otpCode);
+      }
+      
+      return ApiResponse.error(res, emailSent.message || emailSent.error || 'Failed to send verification email. Please check your SMTP configuration.');
     }
 
     return ApiResponse.success(res, null, 'New verification code sent to your email');

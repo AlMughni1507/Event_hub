@@ -386,14 +386,9 @@ router.put('/change-password', authenticateToken, async (req, res) => {
       return ApiResponse.error(res, 'New password and confirm password do not match', 400);
     }
 
-    if (new_password.length < 8) {
-      return ApiResponse.error(res, 'Password must be at least 8 characters', 400);
-    }
-
-    // Validate password strength
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
-    if (!passwordRegex.test(new_password)) {
-      return ApiResponse.error(res, 'Password must contain at least 8 characters with uppercase, lowercase, number, and special character', 400);
+    // Simple password validation - minimal 6 karakter
+    if (!new_password || new_password.length < 6) {
+      return ApiResponse.error(res, 'Password minimal 6 karakter', 400);
     }
 
     // Verify OTP

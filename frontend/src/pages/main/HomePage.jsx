@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { eventsAPI } from '../../services/api';
 import api from '../../services/api';
 import Footer from '../../components/Footer';
+import { getEventImageUrl } from '../../lib/utils';
 
 // Helper function to get category icons (Lucide React)
 const getCategoryIcon = (categoryName) => {
@@ -133,8 +134,8 @@ const HomePage = () => {
           console.log('✅ Featured event set:', highlightedData.data.title);
           
           // Extract color from event image
-          if (highlightedData.data.image_url) {
-            const imageUrl = `http://localhost:3000${highlightedData.data.image_url}`;
+          if (highlightedData.data.image_url || highlightedData.data.image) {
+            const imageUrl = getEventImageUrl(highlightedData.data.image_url || highlightedData.data.image);
             extractDominantColor(imageUrl);
           }
         } else {
@@ -154,7 +155,7 @@ const HomePage = () => {
           
           // Extract color from event image
           if (events[0].image_url || events[0].image) {
-            const imageUrl = `http://localhost:3000${events[0].image_url || events[0].image}`;
+            const imageUrl = getEventImageUrl(events[0].image_url || events[0].image);
             extractDominantColor(imageUrl);
           }
         }
@@ -471,8 +472,8 @@ const HomePage = () => {
           <motion.div 
             className="absolute inset-0 bg-cover bg-center"
             style={{
-              backgroundImage: featuredEvent?.image_url 
-                ? `url(http://localhost:3000${featuredEvent.image_url})`
+              backgroundImage: featuredEvent?.image_url || featuredEvent?.image
+                ? `url(${getEventImageUrl(featuredEvent.image_url || featuredEvent.image)})`
                 : 'url(https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1920&h=1080&fit=crop)',
             }}
             initial={{ scale: 1.1, opacity: 0 }}
@@ -542,13 +543,13 @@ const HomePage = () => {
                 }}
               >
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl group">
-                  {featuredEvent.image_url ? (
+                  {featuredEvent.image_url || featuredEvent.image ? (
                     <img 
-                      src={`http://localhost:3000${featuredEvent.image_url}`}
+                      src={getEventImageUrl(featuredEvent.image_url || featuredEvent.image)}
                       alt={featuredEvent.title}
                       className="w-full h-[500px] object-cover transform group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => {
-                        console.error('Image failed to load:', featuredEvent.image_url);
+                        console.error('Image failed to load:', featuredEvent.image_url || featuredEvent.image);
                         e.target.src = 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800';
                       }}
                     />
@@ -1136,9 +1137,12 @@ const HomePage = () => {
               >
                 <div className="relative h-72 overflow-hidden">
                   <img
-                    src={event.image_url ? `http://localhost:3000${event.image_url}` : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop'}
+                    src={getEventImageUrl(event.image_url || event.image)}
                     alt={event.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => {
+                      e.target.src = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop';
+                    }}
                   />
                   <div className="absolute bottom-4 left-4 flex items-center gap-2 text-white">
                     <MapPin className="w-5 h-5" />
@@ -1238,9 +1242,12 @@ const HomePage = () => {
               >
                 <div className="relative h-80 overflow-hidden">
                   <img
-                    src={event.image_url ? `http://localhost:3000${event.image_url}` : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=300&fit=crop'}
+                    src={getEventImageUrl(event.image_url || event.image)}
                     alt={event.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => {
+                      e.target.src = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=300&fit=crop';
+                    }}
                   />
                   <div className="absolute top-6 right-6">
                     <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-full text-sm font-poppins font-bold shadow-lg">

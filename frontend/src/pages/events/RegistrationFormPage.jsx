@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Footer from '../../components/Footer';
+import { getEventImageUrl } from '../../lib/utils';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 
 const RegistrationFormPage = () => {
@@ -365,9 +366,7 @@ const RegistrationFormPage = () => {
               
               {(event.image_url || event.image) && (
                 <img 
-                  src={event.image_url?.startsWith('http') 
-                    ? event.image_url 
-                    : `http://localhost:3000${event.image_url || event.image}`} 
+                  src={getEventImageUrl(event.image_url || event.image)} 
                   alt={event.title}
                   className="w-full h-40 object-cover rounded-lg mb-4"
                   onError={(e) => {

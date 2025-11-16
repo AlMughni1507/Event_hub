@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import Footer from '../../components/Footer';
+import { getEventImageUrl } from '../../lib/utils';
 import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Clock, Tag, CheckCircle } from 'lucide-react';
 
 const EventDetailModern = () => {
@@ -124,11 +125,7 @@ const EventDetailModern = () => {
             {(event.image_url || event.image) && (
               <div className="w-full h-[300px] md:h-[400px] rounded-2xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 mb-6 shadow-lg relative">
                 <img
-                  src={event.image_url 
-                    ? `http://localhost:3000${event.image_url}` 
-                    : event.image 
-                    ? `http://localhost:3000${event.image}` 
-                    : ''}
+                  src={getEventImageUrl(event.image_url || event.image)}
                   alt={event.title}
                   className="w-full h-full object-cover"
                   onError={(e) => {

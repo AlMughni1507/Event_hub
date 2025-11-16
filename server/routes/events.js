@@ -498,7 +498,7 @@ router.get('/upcoming/events', async (req, res) => {
     const { limit = 5 } = req.query;
 
     const [events] = await query(
-      `SELECT e.*, c.name as category_name,
+      `SELECT e.*, c.name as category_name, e.image as image_url,
               (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
@@ -537,7 +537,7 @@ router.get('/category/:categoryId', async (req, res) => {
 
     // Get events
     const [events] = await query(
-      `SELECT e.*, c.name as category_name,
+      `SELECT e.*, c.name as category_name, e.image as image_url,
               (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
@@ -586,7 +586,7 @@ router.get('/search/events', async (req, res) => {
 
     // Get events
     const [events] = await query(
-      `SELECT e.*, c.name as category_name,
+      `SELECT e.*, c.name as category_name, e.image as image_url,
               (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 

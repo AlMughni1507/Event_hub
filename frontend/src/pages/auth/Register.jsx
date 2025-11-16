@@ -127,17 +127,9 @@ const RegisterPage = () => {
       return;
     }
 
-    // Password complexity validation
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
-    if (!passwordRegex.test(formData.password)) {
-      setMessage(
-        'Password harus minimal 8 karakter dan mengandung:\n' +
-        '• Huruf besar (A-Z)\n' +
-        '• Huruf kecil (a-z)\n' +
-        '• Angka (0-9)\n' +
-        '• Karakter spesial (@$!%*?&#)\n' +
-        'Contoh: Password123#'
-      );
+    // Simple password validation - minimal 6 karakter
+    if (formData.password.length < 6) {
+      setMessage('Password minimal 6 karakter');
       return;
     }
 

@@ -195,15 +195,9 @@ const SettingsPage = () => {
       return;
     }
     
-    if (passwordData.new_password.length < 8) {
-      toast.error('Password minimal 8 karakter');
-      return;
-    }
-
-    // Validate password strength
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
-    if (!passwordRegex.test(passwordData.new_password)) {
-      toast.error('Password harus mengandung minimal 8 karakter dengan huruf besar, huruf kecil, angka, dan karakter spesial');
+    // Simple password validation - minimal 6 karakter
+    if (passwordData.new_password.length < 6) {
+      toast.error('Password minimal 6 karakter');
       return;
     }
 

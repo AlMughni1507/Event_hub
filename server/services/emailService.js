@@ -3,16 +3,20 @@ const { query } = require('../db');
 
 class EmailService {
   constructor() {
+    // Trim and check SMTP credentials
+    const smtpUser = process.env.SMTP_USER?.trim();
+    const smtpPass = process.env.SMTP_PASS?.trim();
+    
     // Check if SMTP credentials are configured
-    this.isConfigured = process.env.SMTP_USER && process.env.SMTP_PASS && 
-                       process.env.SMTP_USER !== 'your-gmail@gmail.com' && 
-                       process.env.SMTP_PASS.trim() !== '';
+    this.isConfigured = smtpUser && smtpPass && 
+                       smtpUser !== 'your-gmail@gmail.com' && 
+                       smtpPass !== '';
     
     console.log('📧 EmailService Configuration:');
-    console.log(`   SMTP_HOST: ${process.env.SMTP_HOST}`);
-    console.log(`   SMTP_PORT: ${process.env.SMTP_PORT}`);
-    console.log(`   SMTP_USER: ${process.env.SMTP_USER}`);
-    console.log(`   SMTP_PASS: ${process.env.SMTP_PASS ? '***configured***' : 'NOT SET'}`);
+    console.log(`   SMTP_HOST: ${process.env.SMTP_HOST || 'smtp.gmail.com'}`);
+    console.log(`   SMTP_PORT: ${process.env.SMTP_PORT || 587}`);
+    console.log(`   SMTP_USER: ${smtpUser || 'NOT SET'}`);
+    console.log(`   SMTP_PASS: ${smtpPass ? '***configured***' : 'NOT SET'}`);
     console.log(`   Is Configured: ${this.isConfigured}`);
     
     if (this.isConfigured) {
@@ -21,18 +25,32 @@ class EmailService {
         port: parseInt(process.env.SMTP_PORT) || 587,
         secure: process.env.SMTP_SECURE === 'true',
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
+          user: smtpUser,
+          pass: smtpPass
         },
-        debug: false,
-        logger: false
+        debug: true, // Enable debug untuk troubleshooting
+        logger: true // Enable logger untuk melihat detail error
       });
       
-      // Skip connection test on startup to prevent crashes
-      console.log('📧 SMTP transporter created (connection test skipped)');
+      // Test connection (non-blocking)
+      this.testConnection().catch(err => {
+        console.error('SMTP test connection error:', err.message);
+      });
+      console.log('📧 SMTP transporter created');
     } else {
       console.warn('❌ SMTP not configured. Email features will use fallback mode.');
       this.transporter = null;
+    }
+  }
+
+  // Test SMTP connection
+  async testConnection() {
+    try {
+      await this.transporter.verify();
+      console.log('✅ SMTP connection verified successfully');
+    } catch (error) {
+      console.error('❌ SMTP connection failed:', error.message);
+      console.error('   Please check your SMTP credentials in config.env');
     }
   }
 
@@ -217,13 +235,27 @@ class EmailService {
       // Force real email sending - no fallback mode
       if (!this.isConfigured || !this.transporter) {
         console.error('❌ SMTP not properly configured');
+        console.error('   SMTP_USER:', process.env.SMTP_USER ? 'SET' : 'NOT SET');
+        console.error('   SMTP_PASS:', process.env.SMTP_PASS ? 'SET' : 'NOT SET');
         return { 
           success: false, 
-          message: 'Email service not configured properly' 
+          message: 'Email service not configured properly. Please check SMTP settings in config.env' 
         };
       }
+
+      // Verify connection before sending
+      try {
+        await this.transporter.verify();
+      } catch (verifyError) {
+        console.error('❌ SMTP verification failed:', verifyError.message);
+        return {
+          success: false,
+          message: `SMTP connection failed: ${verifyError.message}. Please check your SMTP credentials.`
+        };
+      }
+
       const mailOptions = {
-        from: `"Event Yukk Platform" <${process.env.SMTP_USER}>`,
+        from: `"Event Yukk Platform" <${process.env.SMTP_USER?.trim()}>`,
         to: email, // Dynamic - setiap user beda email
         subject: 'Email Verification OTP',
         text: `Your email verification OTP is: ${otpCode}. Valid for 15 minutes.`,
@@ -342,11 +374,35 @@ class EmailService {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ OTP email sent successfully:', info.messageId);
+      console.log('✅ OTP email sent successfully');
+      console.log(`   To: ${email}`);
+      console.log(`   Message ID: ${info.messageId}`);
+      console.log(`   Response: ${info.response}`);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('❌ Error sending OTP email:', error);
-      return { success: false, error: error.message };
+      console.error('❌ Error sending OTP email:');
+      console.error('   Error code:', error.code);
+      console.error('   Error message:', error.message);
+      console.error('   Command:', error.command);
+      console.error('   Response:', error.response);
+      
+      // Provide more helpful error messages
+      let errorMessage = 'Failed to send OTP email';
+      if (error.code === 'EAUTH') {
+        errorMessage = 'SMTP authentication failed. Please check your email and password in config.env';
+      } else if (error.code === 'ECONNECTION') {
+        errorMessage = 'Cannot connect to SMTP server. Please check your SMTP_HOST and SMTP_PORT';
+      } else if (error.response) {
+        errorMessage = `SMTP error: ${error.response}`;
+      } else {
+        errorMessage = error.message || 'Unknown error occurred';
+      }
+      
+      return { 
+        success: false, 
+        error: errorMessage,
+        details: error.message 
+      };
     }
   }
 

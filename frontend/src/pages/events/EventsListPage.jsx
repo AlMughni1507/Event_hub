@@ -4,6 +4,7 @@ import { Search, Filter, Calendar, MapPin, Users, Tag } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import Footer from '../../components/Footer';
+import { getEventImageUrl } from '../../lib/utils';
 
 const EventsListPage = () => {
   const [events, setEvents] = useState([]);
@@ -150,17 +151,24 @@ const EventsListPage = () => {
               >
                 {/* Event Image */}
                 <div className="relative h-56 overflow-hidden">
-                  {event.image_url ? (
+                  {event.image_url || event.image ? (
                     <img
-                      src={`http://localhost:3000${event.image_url}`}
+                      src={getEventImageUrl(event.image_url || event.image)}
                       alt={event.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        const fallback = e.target.nextElementSibling;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                      <Calendar className="w-20 h-20 text-white/30" />
-                    </div>
-                  )}
+                  ) : null}
+                  <div 
+                    className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
+                    style={{ display: (event.image_url || event.image) ? 'none' : 'flex' }}
+                  >
+                    <Calendar className="w-20 h-20 text-white/30" />
+                  </div>
                   <div className="absolute top-4 right-4">
                     <span className="px-4 py-2 bg-purple-600 text-white rounded-full text-sm font-poppins font-bold shadow-lg">
                       {formatPrice(event.registration_fee || event.price)}

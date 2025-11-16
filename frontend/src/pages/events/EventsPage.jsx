@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { eventsAPI, categoriesAPI } from '../../services/api';
+import { getEventImageUrl } from '../../lib/utils';
 import { 
   Sparkles, 
   Laptop, 
@@ -359,19 +360,19 @@ const EventsPage = () => {
                 <div key={event.id} onClick={() => navigate(`/events/${event.id}`)} className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-400 hover:shadow-xl transition-all group cursor-pointer animate-zoom-in" style={{animationDelay: `${index * 0.2}s`}}>
                   {/* Event Image */}
                   <div className="h-48 bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center relative overflow-hidden">
-                    {event.image_url ? (
+                    {event.image_url || event.image ? (
                       <img 
-                        src={`http://localhost:3000${event.image_url}`}
+                        src={getEventImageUrl(event.image_url || event.image)}
                         alt={event.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                         onError={(e) => {
-                          console.error('Image failed to load:', event.image_url);
+                          console.error('Image failed to load:', event.image_url || event.image);
                           e.target.style.display = 'none';
                           e.target.nextSibling.style.display = 'flex';
                         }}
                       />
                     ) : null}
-                    <div className="text-6xl group-hover:scale-110 transition-transform" style={{display: event.image_url ? 'none' : 'flex'}}>
+                    <div className="text-6xl group-hover:scale-110 transition-transform" style={{display: (event.image_url || event.image) ? 'none' : 'flex'}}>
                       {getCategoryIcon(event.category_name)}
                     </div>
                     <div className="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition-all"></div>
