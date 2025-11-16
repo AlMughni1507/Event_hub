@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { Save, ArrowLeft, Calendar, MapPin, Users, DollarSign, Image as ImageIcon } from 'lucide-react';
 import api from '../../services/api';
+import { getServerBaseUrl } from '../../lib/utils';
 
 const EditEvent = () => {
   const { id } = useParams();
@@ -109,7 +110,7 @@ const EditEvent = () => {
       });
 
       if (event.image_url) {
-        setCurrentImage(`http://localhost:3000${event.image_url}`);
+        setCurrentImage(`${getServerBaseUrl()}${event.image_url}`);
       }
     } catch (error) {
       console.error('Error fetching event:', error);
@@ -774,7 +775,7 @@ const EditEvent = () => {
                         ) : performer.existingPhotoUrl ? (
                           <div className="relative w-full h-full">
                             <img 
-                              src={`http://localhost:3000${performer.existingPhotoUrl}`} 
+                              src={`${getServerBaseUrl()}${performer.existingPhotoUrl}`} 
                               alt="Current performer" 
                               className="w-full h-full object-cover"
                             />

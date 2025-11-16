@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import { getServerBaseUrl } from '../../lib/utils';
 
 const SettingsPage = () => {
   const { user, isAuthenticated, logout, setUser } = useAuth();
@@ -448,7 +449,7 @@ const SettingsPage = () => {
                 {avatarPreview ? (
                   <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                 ) : user?.avatar ? (
-                  <img src={`http://localhost:3000${user.avatar}`} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={`${getServerBaseUrl()}${user.avatar}`} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <User className="w-16 h-16 text-white" />

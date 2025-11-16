@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, Lightbulb, Newspaper, Calendar, FileText, Search } from 'lucide-react';
 import Footer from '../../components/Footer';
+import { getApiBaseUrl, getServerBaseUrl } from '../../lib/utils';
 
 const BlogPage = () => {
   const [articles, setArticles] = useState([]);
@@ -52,7 +53,8 @@ const BlogPage = () => {
         params.append('search', searchQuery);
       }
 
-      const response = await fetch(`http://localhost:3000/api/articles?${params}`);
+      const apiBaseUrl = getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/articles?${params}`);
       const data = await response.json();
 
       if (data.success) {
@@ -68,7 +70,7 @@ const BlogPage = () => {
 
   const fetchFeaturedArticles = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/articles/featured');
+      const response = await fetch(`${apiBaseUrl}/articles/featured`);
       const data = await response.json();
 
       if (data.success) {
@@ -218,7 +220,7 @@ const BlogPage = () => {
                   <div className="relative h-56 overflow-hidden">
                     {article.featured_image ? (
                       <img 
-                        src={article.featured_image.startsWith('http') ? article.featured_image : `http://localhost:3000${article.featured_image}`}
+                        src={article.featured_image.startsWith('http') ? article.featured_image : `${getServerBaseUrl()}${article.featured_image}`}
                         alt={article.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         onError={(e) => {
@@ -296,7 +298,7 @@ const BlogPage = () => {
                   <div className="relative h-56 overflow-hidden">
                     {article.featured_image ? (
                       <img 
-                        src={article.featured_image.startsWith('http') ? article.featured_image : `http://localhost:3000${article.featured_image}`}
+                        src={article.featured_image.startsWith('http') ? article.featured_image : `${getServerBaseUrl()}${article.featured_image}`}
                         alt={article.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         onError={(e) => {

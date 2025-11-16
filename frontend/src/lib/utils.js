@@ -3,6 +3,22 @@ export function cn(...inputs) {
 }
 
 /**
+ * Get the API base URL from environment variable or fallback to localhost
+ */
+export function getApiBaseUrl() {
+  return import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+}
+
+/**
+ * Get the server base URL for images and static files
+ */
+export function getServerBaseUrl() {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  // Remove /api from the end if present
+  return apiUrl.replace(/\/api$/, '') || 'http://localhost:3000';
+}
+
+/**
  * Get the full URL for an event image
  * Handles cases where image_url might be null, undefined, or have incorrect paths
  * @param {string|null|undefined} imageUrl - The image URL from the database
@@ -43,6 +59,7 @@ export function getEventImageUrl(imageUrl, fallback = null) {
     path = `/${path}`;
   }
 
-  const fullUrl = `http://localhost:3000${path}`;
+  const serverBaseUrl = getServerBaseUrl();
+  const fullUrl = `${serverBaseUrl}${path}`;
   return fullUrl;
 }

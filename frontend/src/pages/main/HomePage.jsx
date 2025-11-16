@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { eventsAPI } from '../../services/api';
 import api from '../../services/api';
 import Footer from '../../components/Footer';
-import { getEventImageUrl } from '../../lib/utils';
+import { getEventImageUrl, getApiBaseUrl } from '../../lib/utils';
 
 // Helper function to get category icons (Lucide React)
 const getCategoryIcon = (categoryName) => {
@@ -124,7 +124,8 @@ const HomePage = () => {
       
       try {
         // Fetch highlighted event for hero section
-        const highlightedResponse = await fetch('http://localhost:3000/api/events/highlighted/event');
+        const apiBaseUrl = getApiBaseUrl();
+        const highlightedResponse = await fetch(`${apiBaseUrl}/events/highlighted/event`);
         const highlightedData = await highlightedResponse.json();
         
         console.log('✅ Highlighted event response:', highlightedData);
@@ -170,7 +171,7 @@ const HomePage = () => {
         }
         
         // Fetch categories with error handling
-        const categoriesResponse = await fetch('http://localhost:3000/api/categories');
+        const categoriesResponse = await fetch(`${apiBaseUrl}/categories`);
         
         if (!categoriesResponse.ok) {
           console.error('Categories API error:', categoriesResponse.status, categoriesResponse.statusText);

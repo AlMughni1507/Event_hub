@@ -39,7 +39,8 @@ const ContactPage = () => {
 
     try {
       // Use the contact endpoint that saves to database
-      const response = await fetch('http://localhost:3000/api/contact', {
+      const apiBaseUrl = getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
