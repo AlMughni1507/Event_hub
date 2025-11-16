@@ -9,7 +9,8 @@
     "dev": "nodemon server",
     "create-db": "node create-database.js",
     "migrate": "node migrations/runMigration.js",
-    "setup": "npm run create-db && npm run migrate"
+    "setup": "npm run create-db && npm run migrate",
+    "postinstall": "cd ../frontend && npm ci && npm run build && mkdir -p ../server/dist && cp -r dist/* ../server/dist/ || true"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +30,8 @@
     "mysql2": "^3.14.3",
     "node-cron": "^3.0.3",
     "nodemailer": "^7.0.6",
+    "sequelize": "^6.37.7",
+    "sequelize-cli": "^6.6.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

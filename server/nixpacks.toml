@@ -2,20 +2,10 @@
 nixPkgs = ['nodejs-18_x']
 
 [phases.install]
-cmds = [
-  'npm ci',
-  'cd ../frontend && npm ci',
-  'cd ../server'
-]
+cmds = ['npm ci']
 
 [phases.build]
-cmds = [
-  'cd ../frontend && npm run build',
-  'cd ../server',
-  'mkdir -p dist',
-  'cp -r ../frontend/dist/* dist/',
-  'echo "Frontend copied to server/dist"'
-]
+cmds = ['echo "Build complete - frontend copied via postinstall"']
 
 [start]
 cmd = 'NODE_ENV=production node server.js'
