@@ -260,9 +260,17 @@ const SettingsPage = () => {
     try {
       setLoadingRegistrations(true);
       const response = await api.get('/registrations/my-registrations');
-      setRegistrations(response.data?.data?.registrations || []);
+      console.log('📋 Registrations response:', response);
+      // Handle response structure: { success: true, data: { registrations: [...], pagination: {...} } }
+      const registrationsData = response?.data?.data?.registrations || 
+                                response?.data?.registrations ||
+                                response?.registrations ||
+                                [];
+      console.log('📋 Parsed registrations:', registrationsData);
+      setRegistrations(Array.isArray(registrationsData) ? registrationsData : []);
     } catch (error) {
       console.error('Error fetching registrations:', error);
+      console.error('Error response:', error.response?.data);
       setRegistrations([]);
     } finally {
       setLoadingRegistrations(false);

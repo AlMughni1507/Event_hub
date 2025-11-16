@@ -3,6 +3,7 @@ import { useToast } from '../../contexts/ToastContext';
 import ConfirmModal from '../../components/ConfirmModal';
 import { ClipboardList, FileText, Search, Filter, CheckCircle, XCircle, Clock, Award, Download, FileSpreadsheet, Trash2, Trophy, AlertCircle, Ban } from 'lucide-react';
 import { registrationsAPI, eventsAPI, certificatesAPI } from '../../services/api';
+import api from '../../services/api';
 
 const RegistrationsManagement = () => {
   const toast = useToast();
@@ -31,16 +32,18 @@ const RegistrationsManagement = () => {
       if (filters.event_id) params.event_id = filters.event_id;
       if (filters.status) params.status = filters.status;
       
-      const response = await registrationsAPI.getAll(params);
+      // Use admin API endpoint for admin registrations
+      const response = await api.get('/admin/registrations', { params });
       // Handle different response structures
-      const registrationsData = response?.data?.registrations || 
-                                response?.data?.data?.registrations ||
+      const registrationsData = response?.data?.data?.registrations || 
+                                response?.data?.registrations ||
                                 response?.registrations ||
                                 response?.data ||
                                 [];
       setRegistrations(Array.isArray(registrationsData) ? registrationsData : []);
     } catch (error) {
       console.error('Error fetching registrations:', error);
+      toast.error('Gagal memuat data registrations');
     } finally {
       setLoading(false);
     }
