@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Users, Clock, ArrowRight, Ticket, Star, UserCircle2, Music, Code, Briefcase, Dumbbell, GraduationCap, Palette, Utensils, HeartPulse, Wrench, Mic, BarChart3, PartyPopper, Drama, Gamepad2, Shirt, Plane, Microscope, Heart } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, ArrowRight, Ticket, Star, UserCircle2, Music, Code, Briefcase, Dumbbell, GraduationCap, Palette, Utensils, HeartPulse, Wrench, Mic, BarChart3, PartyPopper, Drama, Gamepad2, Shirt, Plane, Microscope, Heart, MessageSquare, Send, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FadeInUp, FadeInLeft, FadeInRight, ScaleIn, StaggerContainer, StaggerItem, HoverScale, RevealOnScroll, RotateIn } from '../../components/ScrollAnimation';
 import { useAuth } from '../../contexts/AuthContext';
-import { eventsAPI, reviewsAPI } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
+import { eventsAPI } from '../../services/api';
 import api from '../../services/api';
 import Footer from '../../components/Footer';
-import { getEventImageUrl, getApiBaseUrl } from '../../lib/utils';
-import { useToast } from '../../contexts/ToastContext';
 
 // Helper function to get category icons (Lucide React)
 const getCategoryIcon = (categoryName) => {
@@ -57,17 +56,13 @@ const HomePage = () => {
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [scrolled, setScrolled] = useState(false);
   const [dominantColor, setDominantColor] = useState({ r: 147, g: 51, b: 234 }); // Default purple
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '', full_name: '' });
+  const [submittingReview, setSubmittingReview] = useState(false);
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const toast = useToast();
   const hasFetched = useRef(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [reviewForm, setReviewForm] = useState({
-    rating: 5,
-    comment: '',
-    full_name: user?.full_name || ''
-  });
-  const [submittingReview, setSubmittingReview] = useState(false);
 
   // Extract dominant color from image
   const extractDominantColor = (imageSrc) => {
@@ -118,33 +113,33 @@ const HomePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch events function
-  const fetchEvents = React.useCallback(async (forceRefresh = false) => {
-    // Skip if already fetching (unless force refresh)
-    if (!forceRefresh && hasFetched.current) {
-      console.log('Skipping fetch - already in progress');
-      return;
-    }
-    
-    if (!forceRefresh) {
+  // Fetch events
+  useEffect(() => {
+    let isMounted = true; // Track if component is mounted
+
+    const fetchEvents = async () => {
+      // Skip if already fetching or component unmounted
+      if (hasFetched.current || !isMounted) {
+        console.log('Skipping fetch - already in progress or unmounted');
+        return;
+      }
+      
       hasFetched.current = true;
-    }
       
-    try {
-      // Fetch highlighted event for hero section
-      const apiBaseUrl = getApiBaseUrl();
-      const highlightedResponse = await fetch(`${apiBaseUrl}/events/highlighted/event`);
-      const highlightedData = await highlightedResponse.json();
-      
-      console.log('✅ Highlighted event response:', highlightedData);
-      
-      if (highlightedData.success && highlightedData.data) {
+      try {
+        // Fetch highlighted event for hero section
+        const highlightedResponse = await fetch('http://localhost:3000/api/events/highlighted/event');
+        const highlightedData = await highlightedResponse.json();
+        
+        console.log('✅ Highlighted event response:', highlightedData);
+        
+        if (highlightedData.success && highlightedData.data && isMounted) {
           setFeaturedEvent(highlightedData.data);
           console.log('✅ Featured event set:', highlightedData.data.title);
           
           // Extract color from event image
-          if (highlightedData.data.image_url || highlightedData.data.image) {
-            const imageUrl = getEventImageUrl(highlightedData.data.image_url || highlightedData.data.image);
+          if (highlightedData.data.image_url) {
+            const imageUrl = `http://localhost:3000${highlightedData.data.image_url}`;
             extractDominantColor(imageUrl);
           }
         } else {
@@ -157,38 +152,41 @@ const HomePage = () => {
         
         console.log('✅ All events fetched:', events.length);
         
-      // If no featured event was set, use the first event as featured
-      if (!highlightedData.data && events.length > 0) {
-        console.log('📌 Setting first event as featured:', events[0].title);
-        setFeaturedEvent(events[0]);
-        
-        // Extract color from event image
-        if (events[0].image_url || events[0].image) {
-          const imageUrl = getEventImageUrl(events[0].image_url || events[0].image);
-          extractDominantColor(imageUrl);
+        // If no featured event was set, use the first event as featured
+        if (!highlightedData.data && events.length > 0 && isMounted) {
+          console.log('📌 Setting first event as featured:', events[0].title);
+          setFeaturedEvent(events[0]);
+          
+          // Extract color from event image
+          if (events[0].image_url || events[0].image) {
+            const imageUrl = `http://localhost:3000${events[0].image_url || events[0].image}`;
+            extractDominantColor(imageUrl);
+          }
         }
-      }
-      
-      // Get all active events (include highlighted event in regular sections)
-      const allActiveEvents = events;
-      
-      console.log('✅ Active events for sections:', allActiveEvents.length);
-      setUpcomingEvents(allActiveEvents);
-      
-      // Fetch categories with error handling
-      const categoriesResponse = await fetch(`${apiBaseUrl}/categories`);
-      
-      if (!categoriesResponse.ok) {
-        console.error('Categories API error:', categoriesResponse.status, categoriesResponse.statusText);
-        setCategories([]);
-        return;
-      }
-      
-      const categoriesData = await categoriesResponse.json();
-      console.log('Categories response:', categoriesData);
-      console.log('Categories data structure:', JSON.stringify(categoriesData, null, 2));
-      
-      if (categoriesData.success) {
+        
+        // Get all active events (include highlighted event in regular sections)
+        const allActiveEvents = events;
+        
+        console.log('✅ Active events for sections:', allActiveEvents.length);
+        
+        if (isMounted) {
+          setUpcomingEvents(allActiveEvents);
+        }
+        
+        // Fetch categories with error handling
+        const categoriesResponse = await fetch('http://localhost:3000/api/categories');
+        
+        if (!categoriesResponse.ok) {
+          console.error('Categories API error:', categoriesResponse.status, categoriesResponse.statusText);
+          if (isMounted) setCategories([]);
+          return;
+        }
+        
+        const categoriesData = await categoriesResponse.json();
+        console.log('Categories response:', categoriesData);
+        console.log('Categories data structure:', JSON.stringify(categoriesData, null, 2));
+        
+        if (categoriesData.success && isMounted) {
           // API returns: { success: true, data: { categories: [...] } }
           // Try multiple paths to get the categories array
           const cats = categoriesData.data?.categories || categoriesData.data || categoriesData.categories || [];
@@ -226,18 +224,40 @@ const HomePage = () => {
               return true;
             });
             
-        console.log('Final unique active categories:', uniqueCategories.length);
-        console.log('Categories to set:', uniqueCategories);
-        setCategories(uniqueCategories);
-      } else {
-        console.log('No categories array or empty array, cats:', cats);
-        setCategories([]);
-      }
-    } else {
-      setCategories([]);
-    }
+            console.log('Final unique active categories:', uniqueCategories.length);
+            console.log('Categories to set:', uniqueCategories);
+            setCategories(uniqueCategories);
+          } else {
+            console.log('No categories array or empty array, cats:', cats);
+            setCategories([]);
+          }
+        } else if (isMounted) {
+          setCategories([]);
+        }
 
-    // Fetch approved reviews from database
+        // Fetch approved reviews from database
+        await fetchReviews();
+        
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchEvents();
+    
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      hasFetched.current = false; // Reset ref so data can be fetched again on remount
+    };
+  }, []);
+
+  // Fetch reviews function
+  const fetchReviews = async () => {
     try {
       const reviewsResponse = await api.get('/reviews', { params: { limit: 20 } });
       console.log('Reviews API response:', reviewsResponse);
@@ -251,30 +271,76 @@ const HomePage = () => {
       console.error('Error fetching reviews:', error);
       setReviews([]);
     }
+  };
+
+  // Handle review submission
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
     
+    if (!isAuthenticated) {
+      toast.error('Silakan login terlebih dahulu untuk memberikan review');
+      navigate('/login');
+      return;
+    }
+
+    if (reviewForm.comment.length < 10) {
+      toast.error('Review minimal 10 karakter');
+      return;
+    }
+
+    if (!reviewForm.full_name.trim()) {
+      toast.error('Nama lengkap harus diisi');
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      await api.post('/reviews', {
+        rating: reviewForm.rating,
+        comment: reviewForm.comment,
+        full_name: reviewForm.full_name
+      });
+      
+      toast.success('Review berhasil dikirim! Menunggu persetujuan admin.');
+      setShowReviewModal(false);
+      setReviewForm({
+        rating: 5,
+        comment: '',
+        full_name: user?.full_name || ''
+      });
+      
+      // Refresh reviews
+      await fetchReviews();
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error submitting review:', error);
+      toast.error(error?.message || 'Gagal mengirim review');
     } finally {
-      setLoading(false);
+      setSubmittingReview(false);
     }
-  }, []);
+  };
 
-  // Fetch events on mount
-  useEffect(() => {
-    if (!hasFetched.current) {
-      fetchEvents();
+  // Open review modal
+  const openReviewModal = () => {
+    console.log('openReviewModal called');
+    console.log('isAuthenticated:', isAuthenticated);
+    console.log('user:', user);
+    
+    if (!isAuthenticated) {
+      console.log('User not authenticated, redirecting to login');
+      toast.error('Silakan login terlebih dahulu untuk memberikan review');
+      navigate('/login');
+      return;
     }
-  }, [fetchEvents]);
-
-  // Update review form when user changes
-  useEffect(() => {
-    if (user && isAuthenticated) {
-      setReviewForm(prev => ({
-        ...prev,
-        full_name: user.full_name || user.username || prev.full_name
-      }));
-    }
-  }, [user, isAuthenticated]);
+    
+    console.log('Opening modal...');
+    setReviewForm({
+      rating: 5,
+      comment: '',
+      full_name: user?.full_name || user?.username || ''
+    });
+    setShowReviewModal(true);
+    console.log('Modal state set to true');
+  };
 
   // Countdown timer for featured event
   useEffect(() => {
@@ -396,7 +462,7 @@ const HomePage = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                EVENT YUKK
+                EVENTHUB
               </motion.span>
             </div>
 
@@ -480,8 +546,8 @@ const HomePage = () => {
           <motion.div 
             className="absolute inset-0 bg-cover bg-center"
             style={{
-              backgroundImage: featuredEvent?.image_url || featuredEvent?.image
-                ? `url(${getEventImageUrl(featuredEvent.image_url || featuredEvent.image)})`
+              backgroundImage: featuredEvent?.image_url 
+                ? `url(http://localhost:3000${featuredEvent.image_url})`
                 : 'url(https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1920&h=1080&fit=crop)',
             }}
             initial={{ scale: 1.1, opacity: 0 }}
@@ -551,13 +617,13 @@ const HomePage = () => {
                 }}
               >
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl group">
-                  {featuredEvent.image_url || featuredEvent.image ? (
+                  {featuredEvent.image_url ? (
                     <img 
-                      src={getEventImageUrl(featuredEvent.image_url || featuredEvent.image)}
+                      src={`http://localhost:3000${featuredEvent.image_url}`}
                       alt={featuredEvent.title}
                       className="w-full h-[500px] object-cover transform group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => {
-                        console.error('Image failed to load:', featuredEvent.image_url || featuredEvent.image);
+                        console.error('Image failed to load:', featuredEvent.image_url);
                         e.target.src = 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800';
                       }}
                     />
@@ -1145,12 +1211,9 @@ const HomePage = () => {
               >
                 <div className="relative h-72 overflow-hidden">
                   <img
-                    src={getEventImageUrl(event.image_url || event.image)}
+                    src={event.image_url ? `http://localhost:3000${event.image_url}` : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop'}
                     alt={event.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    onError={(e) => {
-                      e.target.src = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop';
-                    }}
                   />
                   <div className="absolute bottom-4 left-4 flex items-center gap-2 text-white">
                     <MapPin className="w-5 h-5" />
@@ -1250,12 +1313,9 @@ const HomePage = () => {
               >
                 <div className="relative h-80 overflow-hidden">
                   <img
-                    src={getEventImageUrl(event.image_url || event.image)}
+                    src={event.image_url ? `http://localhost:3000${event.image_url}` : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=300&fit=crop'}
                     alt={event.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    onError={(e) => {
-                      e.target.src = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=300&fit=crop';
-                    }}
                   />
                   <div className="absolute top-6 right-6">
                     <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-full text-sm font-poppins font-bold shadow-lg">
@@ -1422,7 +1482,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Reviews Section - Testimonials */}
+      {/* Reviews Section - Testimonials with Dynamic Animations */}
       <section className="py-32 bg-gradient-to-b from-white via-purple-50 to-white relative overflow-hidden">
         {/* Decorative Elements */}
         <div className="absolute top-0 left-0 w-96 h-96 bg-pink-200 rounded-full blur-3xl opacity-20"></div>
@@ -1446,238 +1506,358 @@ const HomePage = () => {
               <p className="font-poppins text-gray-600 text-xl max-w-3xl mx-auto leading-relaxed">
                 Real experiences from our <span className="font-bold text-purple-600">amazing community</span>
               </p>
-              {isAuthenticated && (
+              
+              {/* Add Review Button - Only show if there are reviews */}
+              {reviews.length > 0 && (
                 <motion.button
-                  onClick={() => setShowReviewModal(true)}
-                  className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-poppins font-bold transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                  onClick={openReviewModal}
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-poppins font-bold shadow-xl hover:shadow-2xl transition-all mt-6"
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <Star className="w-5 h-5" />
-                  Tulis Ulasan
+                  <MessageSquare className="w-5 h-5" />
+                  Tulis Review Anda
                 </motion.button>
               )}
             </div>
           </FadeInUp>
 
-          {/* Reviews Grid */}
+          {/* Reviews Grid with Dynamic Moving Animations */}
           {reviews.length > 0 ? (
-            <StaggerContainer staggerDelay={0.15}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {reviews.slice(0, 6).map((review, index) => (
-                  <StaggerItem key={review.id}>
-                    <motion.div
-                      className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 relative overflow-hidden group"
-                      whileHover={{ y: -10 }}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {reviews.slice(0, 6).map((review, index) => (
+                <motion.div
+                  key={review.id}
+                  className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 relative overflow-hidden group"
+                  initial={{ opacity: 0, y: 50, rotateX: -15 }}
+                  whileInView={{ 
+                    opacity: 1, 
+                    y: 0, 
+                    rotateX: 0,
+                    transition: {
+                      delay: index * 0.1,
+                      duration: 0.6,
+                      type: "spring",
+                      stiffness: 100
+                    }
+                  }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  animate={{ 
+                    y: [0, -8, 0],
+                    rotateZ: [0, (index % 2 === 0 ? 1 : -1), 0]
+                  }}
+                  transition={{
+                    y: {
+                      duration: 3 + (index * 0.2),
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: index * 0.3
+                    },
+                    rotateZ: {
+                      duration: 4 + (index * 0.2),
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: index * 0.3
+                    }
+                  }}
+                  whileHover={{ 
+                    y: -15,
+                    scale: 1.05,
+                    rotateZ: 0,
+                    transition: {
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 10
+                    }
+                  }}
+                >
+                  {/* Gradient Border Effect */}
+                  <motion.div 
+                    className="absolute inset-0 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 opacity-0 group-hover:opacity-100 rounded-2xl transition-opacity duration-300"
+                    style={{ padding: '2px' }}
+                  >
+                    <div className="bg-white rounded-2xl w-full h-full"></div>
+                  </motion.div>
+                  
+                  <div className="relative z-10">
+                    {/* Stars Rating with Sequential Animation */}
+                    <div className="flex gap-1 mb-4">
+                      {[...Array(5)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, scale: 0, rotate: -180 }}
+                          whileInView={{ 
+                            opacity: 1, 
+                            scale: 1, 
+                            rotate: 0,
+                            transition: { 
+                              delay: index * 0.1 + i * 0.05,
+                              type: "spring",
+                              stiffness: 200 
+                            }
+                          }}
+                          viewport={{ once: true }}
+                          whileHover={{ 
+                            scale: 1.3, 
+                            rotate: 360,
+                            transition: { duration: 0.3 }
+                          }}
+                        >
+                          <Star 
+                            className={`w-5 h-5 ${
+                              i < (review.rating || 5) 
+                                ? 'fill-yellow-400 text-yellow-400' 
+                                : 'text-gray-300'
+                            }`} 
+                          />
+                        </motion.div>
+                      ))}
+                    </div>
+                    
+                    {/* Review Text with Fade In */}
+                    <motion.p 
+                      className="font-poppins text-gray-700 text-base mb-6 leading-relaxed line-clamp-4"
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      transition={{ delay: index * 0.1 + 0.3 }}
+                      viewport={{ once: true }}
                     >
-                      {/* Gradient Border Effect */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ padding: '2px' }}>
-                        <div className="bg-white rounded-2xl w-full h-full"></div>
-                      </div>
-                      
-                      <div className="relative z-10">
-                        {/* Stars Rating */}
-                        <div className="flex gap-1 mb-4">
-                          {[...Array(5)].map((_, i) => (
-                            <motion.div
-                              key={i}
-                              initial={{ opacity: 0, scale: 0 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: index * 0.1 + i * 0.05 }}
-                            >
-                              <Star 
-                                className={`w-5 h-5 ${
-                                  i < (review.rating || 5) 
-                                    ? 'fill-yellow-400 text-yellow-400' 
-                                    : 'text-gray-300'
-                                }`} 
-                              />
-                            </motion.div>
-                          ))}
-                        </div>
-                        
-                        {/* Review Text */}
-                        <p className="font-poppins text-gray-700 text-base mb-6 leading-relaxed line-clamp-4">
-                          "{review.comment || review.review_text}"
+                      "{review.comment || review.review_text}"
+                    </motion.p>
+                    
+                    {/* User Info with Slide In */}
+                    <motion.div 
+                      className="flex items-center gap-4"
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 + 0.4 }}
+                      viewport={{ once: true }}
+                    >
+                      <motion.div 
+                        className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+                        whileHover={{ scale: 1.2, rotate: 360 }}
+                        transition={{ type: "spring", stiffness: 300 }}
+                      >
+                        {(review.full_name || review.username || 'A').charAt(0).toUpperCase()}
+                      </motion.div>
+                      <div>
+                        <h4 className="font-poppins font-bold text-gray-900">
+                          {review.full_name || review.username || 'Anonymous'}
+                        </h4>
+                        <p className="font-poppins text-sm text-gray-500">
+                          Verified User
                         </p>
-                        
-                        {/* User Info */}
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                            {(review.user_name || review.username || 'A').charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <h4 className="font-poppins font-bold text-gray-900">
-                              {review.user_name || review.username || 'Anonymous'}
-                            </h4>
-                            <p className="font-poppins text-sm text-gray-500">
-                              {review.event_title || 'Event Attendee'}
-                            </p>
-                          </div>
-                        </div>
                       </div>
                     </motion.div>
-                  </StaggerItem>
-                ))}
-              </div>
-            </StaggerContainer>
+                  </div>
+                  
+                  {/* Decorative Corner Sparkle */}
+                  <motion.div
+                    className="absolute top-4 right-4 text-purple-400 opacity-0 group-hover:opacity-100"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Star className="w-6 h-6 fill-current" />
+                  </motion.div>
+                </motion.div>
+              ))}
+            </div>
           ) : (
-            <div className="text-center py-16 bg-white rounded-2xl shadow-lg">
+            <motion.div 
+              className="text-center py-16 bg-white rounded-2xl shadow-lg"
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5 }}
+            >
               <div className="text-6xl mb-4">💬</div>
               <h3 className="font-bebas text-3xl text-gray-800 mb-2">No Reviews Yet</h3>
               <p className="font-poppins text-gray-600 mb-6">Be the first to share your experience!</p>
-              {isAuthenticated && (
-                <motion.button
-                  onClick={() => setShowReviewModal(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full font-poppins font-bold transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Star className="w-5 h-5" />
-                  Tulis Ulasan Pertama
-                </motion.button>
-              )}
-            </div>
+              <motion.button
+                onClick={openReviewModal}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-poppins font-bold shadow-lg"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <MessageSquare className="w-5 h-5" />
+                Tulis Review Pertama
+              </motion.button>
+            </motion.div>
+          )}
+          
+          {/* View All Reviews Link */}
+          {reviews.length > 6 && (
+            <motion.div 
+              className="text-center mt-12"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <motion.button
+                onClick={() => navigate('/reviews')}
+                className="inline-flex items-center gap-2 px-8 py-4 bg-white text-purple-600 border-2 border-purple-600 rounded-2xl font-poppins font-bold hover:bg-purple-600 hover:text-white transition-all shadow-lg"
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Lihat Semua Review ({reviews.length})
+                <ArrowRight className="w-5 h-5" />
+              </motion.button>
+            </motion.div>
           )}
         </div>
       </section>
 
       {/* Review Modal */}
-      {showReviewModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <AnimatePresence>
+        {showReviewModal && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              console.log('Modal backdrop clicked');
+              setShowReviewModal(false);
+            }}
           >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-bebas text-3xl text-gray-900">Tulis Ulasan</h3>
-              <button
-                onClick={() => setShowReviewModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+            <motion.div
+              className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl relative z-[10000]"
+              initial={{ scale: 0.9, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 50 }}
+              onClick={(e) => {
+                console.log('Modal content clicked, stopping propagation');
+                e.stopPropagation();
+              }}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-bebas text-4xl text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
+                  Tulis Review Anda
+                </h3>
+                <motion.button
+                  onClick={() => setShowReviewModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <X className="w-6 h-6 text-gray-500" />
+                </motion.button>
+              </div>
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!isAuthenticated) {
-                toast.error('Silakan login terlebih dahulu');
-                navigate('/login');
-                return;
-              }
-
-              if (reviewForm.comment.length < 10) {
-                toast.error('Ulasan minimal 10 karakter');
-                return;
-              }
-
-              setSubmittingReview(true);
-              try {
-                await reviewsAPI.create({
-                  rating: reviewForm.rating,
-                  comment: reviewForm.comment,
-                  full_name: reviewForm.full_name || user?.full_name || user?.username
-                });
-                toast.success('Ulasan berhasil dikirim! Menunggu persetujuan admin.');
-                setShowReviewModal(false);
-                setReviewForm({ rating: 5, comment: '', full_name: user?.full_name || '' });
-                // Refresh reviews after a delay (force refresh)
-                setTimeout(() => {
-                  fetchEvents(true);
-                }, 1000);
-              } catch (error) {
-                console.error('Error submitting review:', error);
-                toast.error(error?.message || 'Gagal mengirim ulasan. Silakan coba lagi.');
-              } finally {
-                setSubmittingReview(false);
-              }
-            }}>
-              <div className="space-y-6">
-                {/* Rating */}
-                <div>
-                  <label className="block font-poppins font-semibold text-gray-700 mb-3">
-                    Rating
-                  </label>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setReviewForm({ ...reviewForm, rating: star })}
-                        className="transition-transform hover:scale-125"
-                      >
-                        <Star
-                          className={`w-10 h-10 ${
-                            star <= reviewForm.rating
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Full Name */}
+              {/* Review Form */}
+              <form onSubmit={handleReviewSubmit} className="space-y-6">
+                {/* Name Input */}
                 <div>
                   <label className="block font-poppins font-semibold text-gray-700 mb-2">
-                    Nama Lengkap
+                    Nama Lengkap *
                   </label>
                   <input
                     type="text"
                     value={reviewForm.full_name}
                     onChange={(e) => setReviewForm({ ...reviewForm, full_name: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-poppins"
-                    placeholder="Masukkan nama lengkap"
+                    placeholder="Masukkan nama lengkap Anda"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl font-poppins focus:border-purple-500 focus:outline-none transition-colors"
                     required
                   />
                 </div>
 
-                {/* Comment */}
+                {/* Rating Selector */}
                 <div>
                   <label className="block font-poppins font-semibold text-gray-700 mb-2">
-                    Ulasan
+                    Rating *
+                  </label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <motion.button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                        className="p-2"
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <Star
+                          className={`w-8 h-8 ${
+                            star <= reviewForm.rating
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Comment Textarea */}
+                <div>
+                  <label className="block font-poppins font-semibold text-gray-700 mb-2">
+                    Review Anda * (minimal 10 karakter)
                   </label>
                   <textarea
                     value={reviewForm.comment}
                     onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-poppins min-h-[120px]"
-                    placeholder="Bagikan pengalaman Anda..."
+                    placeholder="Ceritakan pengalaman Anda menggunakan EventHub..."
+                    rows={6}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl font-poppins focus:border-purple-500 focus:outline-none transition-colors resize-none"
                     required
                     minLength={10}
                   />
-                  <p className="text-sm text-gray-500 mt-2">
-                    {reviewForm.comment.length}/10 karakter minimum
+                  <p className="text-sm text-gray-500 mt-1 font-poppins">
+                    {reviewForm.comment.length} karakter
                   </p>
                 </div>
 
+                {/* Info Alert */}
+                <motion.div
+                  className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <p className="font-poppins text-sm text-purple-700">
+                    ℹ️ Review Anda akan ditinjau oleh admin terlebih dahulu sebelum dipublikasikan.
+                  </p>
+                </motion.div>
+
                 {/* Submit Button */}
                 <div className="flex gap-4">
-                  <button
+                  <motion.button
                     type="button"
                     onClick={() => setShowReviewModal(false)}
-                    className="flex-1 px-6 py-3 border border-gray-300 rounded-xl font-poppins font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex-1 px-6 py-4 bg-gray-100 text-gray-700 rounded-xl font-poppins font-bold hover:bg-gray-200 transition-colors"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                   >
                     Batal
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
                     type="submit"
-                    disabled={submittingReview || reviewForm.comment.length < 10}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-xl font-poppins font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                    disabled={submittingReview}
+                    className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-poppins font-bold hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    whileHover={{ scale: submittingReview ? 1 : 1.02 }}
+                    whileTap={{ scale: submittingReview ? 1 : 0.98 }}
                   >
-                    {submittingReview ? 'Mengirim...' : 'Kirim Ulasan'}
-                  </button>
+                    {submittingReview ? (
+                      <>
+                        <motion.div
+                          className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        />
+                        Mengirim...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5" />
+                        Kirim Review
+                      </>
+                    )}
+                  </motion.button>
                 </div>
-              </div>
-            </form>
+              </form>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Mobile App Preview Section */}
       <section className="py-32 bg-gradient-to-br from-purple-900 via-purple-800 to-black relative overflow-hidden">
@@ -1702,7 +1882,7 @@ const HomePage = () => {
                 </motion.div>
                 
                 <h2 className="font-bebas text-5xl md:text-7xl font-black mb-6 leading-tight">
-                  Get Event Yukk<br/>On Mobile
+                  Get EventHub<br/>On Mobile
                 </h2>
                 
                 <p className="font-poppins text-gray-300 text-xl mb-8 leading-relaxed">
@@ -1734,24 +1914,9 @@ const HomePage = () => {
                   ))}
                 </div>
                 
-                {/* CTA Button to Mobile App Page */}
-                <motion.button
-                  onClick={() => navigate('/mobile-app')}
-                  className="mb-6 px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-2xl font-poppins font-bold transition-all shadow-lg hover:shadow-2xl flex items-center gap-3"
-                  whileHover={{ scale: 1.05, y: -3 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <span>📱</span>
-                  <span>Lihat Halaman Mobile App</span>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </motion.button>
-
                 {/* Download Buttons */}
                 <div className="flex flex-wrap gap-4">
                   <motion.button
-                    onClick={() => navigate('/mobile-app')}
                     className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-2xl font-poppins font-bold hover:shadow-2xl transition-all"
                     whileHover={{ scale: 1.05, y: -3 }}
                     whileTap={{ scale: 0.95 }}
@@ -1766,7 +1931,6 @@ const HomePage = () => {
                   </motion.button>
                   
                   <motion.button
-                    onClick={() => navigate('/mobile-app')}
                     className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-2xl font-poppins font-bold hover:shadow-2xl transition-all"
                     whileHover={{ scale: 1.05, y: -3 }}
                     whileTap={{ scale: 0.95 }}

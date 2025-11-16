@@ -49,7 +49,7 @@ router.get('/my-registrations', async (req, res) => {
 
     // Get total count
     const [countResult] = await query(
-      `SELECT COUNT(*) as total FROM event_registrations er ${whereClause}`,
+      `SELECT COUNT(*) as total FROM registrations er ${whereClause}`,
       params
     );
 
@@ -65,7 +65,7 @@ router.get('/my-registrations', async (req, res) => {
               er.payment_status,
               at.token as attendance_token,
               c.name as category_name
-       FROM event_registrations er
+       FROM registrations er
        LEFT JOIN events e ON er.event_id = e.id
        LEFT JOIN categories c ON e.category_id = c.id
        LEFT JOIN attendance_tokens at ON at.user_id = er.user_id AND at.event_id = er.event_id
@@ -456,30 +456,27 @@ router.post('/', validateRegistration, handleValidationErrors, async (req, res) 
     if (registrationStatus === 'approved') {
       // Generate attendance token
       console.log('🔑 Generating token...');
+      tokenData = await TokenService.createAttendanceToken(
+        eventRegistrationId,
+        req.user.id,
+        event_id
+      );
+
+      console.log('✅ Token generated:', tokenData.token);
+
+      // Send token via email
       try {
-        tokenData = await TokenService.createAttendanceToken(
-          eventRegistrationId,
-          req.user.id,
-          event_id
-        );
-
-        console.log('✅ Token generated:', tokenData.token);
-
-        // Send token via email (non-blocking)
-        TokenService.sendTokenEmail(
+        console.log('📧 Sending token email...');
+        await TokenService.sendTokenEmail(
           registrantEmail || req.user.email,
           registrantName || req.user.full_name,
           event.title,
           tokenData.token
-        ).then(() => {
-          console.log('✅ Token email sent');
-        }).catch((emailError) => {
-          console.error('❌ Failed to send token email:', emailError);
-          // Don't fail registration if email fails - token is still created
-        });
-      } catch (tokenError) {
-        console.error('❌ Failed to generate token:', tokenError);
-        // Continue even if token generation fails
+        );
+        console.log('✅ Token email sent');
+      } catch (emailError) {
+        console.error('❌ Failed to send token email:', emailError);
+        // Don't fail registration if email fails
       }
     } else {
       console.log('ℹ️ Registration pending payment - token will be generated after confirmation');

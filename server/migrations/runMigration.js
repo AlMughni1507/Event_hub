@@ -1,4 +1,4 @@
-const { query } = require('../db');
+const { promisePool } = require('../db');
 const fs = require('fs');
 const path = require('path');
 
@@ -7,7 +7,7 @@ async function runMigrations() {
     console.log('🔄 Starting database migrations...');
 
     // Create migrations table if not exists
-    await query(`
+    await promisePool.query(`
       CREATE TABLE IF NOT EXISTS migrations (
         id INT AUTO_INCREMENT PRIMARY KEY,
         migration_name VARCHAR(255) NOT NULL UNIQUE,
@@ -25,7 +25,7 @@ async function runMigrations() {
 
     for (const file of files) {
       // Check if migration already executed
-      const [existing] = await query(
+      const [existing] = await promisePool.query(
         'SELECT * FROM migrations WHERE migration_name = ?',
         [file]
       );
@@ -41,25 +41,57 @@ async function runMigrations() {
       const sqlPath = path.join(migrationsDir, file);
       const sql = fs.readFileSync(sqlPath, 'utf8');
 
-      // Split by semicolon and execute each statement
-      const statements = sql
-        .split(';')
-        .map(s => s.trim())
-        .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('SELECT'));
+      // Split SQL into individual statements
+      // Handle multi-line statements properly
+      const statements = [];
+      let currentStatement = '';
+      const lines = sql.split('\n');
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        // Skip comments and empty lines
+        if (trimmedLine.startsWith('--') || trimmedLine.length === 0) {
+          continue;
+        }
+        
+        currentStatement += line + '\n';
+        
+        // Check if statement is complete (ends with semicolon)
+        if (trimmedLine.endsWith(';')) {
+          statements.push(currentStatement.trim());
+          currentStatement = '';
+        }
+      }
+      
+      // Add last statement if exists
+      if (currentStatement.trim().length > 0) {
+        statements.push(currentStatement.trim());
+      }
 
+      // Execute each statement
       for (const statement of statements) {
+        if (statement.length === 0) continue;
+        
         try {
-          await query(statement);
+          await promisePool.query(statement);
         } catch (err) {
-          // Ignore errors for statements that might already exist
-          if (!err.message.includes('Duplicate column')) {
-            console.warn(`⚠️  Warning in ${file}:`, err.message);
+          // Log error but continue
+          const ignorable = [
+            'Duplicate entry',
+            'already exists',
+            'Duplicate column',
+            'Unknown column'
+          ].some(pattern => err.message.includes(pattern));
+          
+          if (!ignorable) {
+            console.error(`❌ Error in ${file}:`, err.message.substring(0, 150));
           }
         }
       }
 
       // Mark migration as executed
-      await query(
+      await promisePool.query(
         'INSERT INTO migrations (migration_name) VALUES (?)',
         [file]
       );
@@ -75,3 +107,16 @@ async function runMigrations() {
 }
 
 module.exports = { runMigrations };
+
+// Run migrations if this file is executed directly
+if (require.main === module) {
+  runMigrations()
+    .then(() => {
+      console.log('✅ Migration process completed!');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('❌ Migration failed:', error);
+      process.exit(1);
+    });
+}

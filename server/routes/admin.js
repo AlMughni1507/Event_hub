@@ -339,6 +339,38 @@ router.get('/registrations', async (req, res) => {
   }
 });
 
+// Delete registration (admin only)
+router.delete('/registrations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if registration exists
+    const [registrations] = await query(
+      'SELECT * FROM event_registrations WHERE id = ?',
+      [id]
+    );
+
+    if (registrations.length === 0) {
+      return ApiResponse.notFound(res, 'Registration not found');
+    }
+
+    const registration = registrations[0];
+
+    // Delete related data first (attendance tokens, certificates if any)
+    await query('DELETE FROM attendance_tokens WHERE user_id = ? AND event_id = ?', 
+      [registration.user_id, registration.event_id]);
+
+    // Delete registration
+    await query('DELETE FROM event_registrations WHERE id = ?', [id]);
+
+    return ApiResponse.success(res, null, 'Registration deleted successfully');
+
+  } catch (error) {
+    console.error('Delete registration error:', error);
+    return ApiResponse.error(res, 'Failed to delete registration');
+  }
+});
+
 // Update registration status
 router.put('/registrations/:id/status', async (req, res) => {
   try {
