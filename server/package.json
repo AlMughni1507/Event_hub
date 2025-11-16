@@ -10,7 +10,7 @@
     "create-db": "node create-database.js",
     "migrate": "node migrations/runMigration.js",
     "setup": "npm run create-db && npm run migrate",
-    "postinstall": "cd ../frontend && npm ci && npm run build && mkdir -p ../server/dist && cp -r dist/* ../server/dist/ || true"
+    "postinstall": "cd ../frontend && npm ci && npm run build && cd ../server && node copy-frontend.js"
   },
   "keywords": [],
   "author": "",
