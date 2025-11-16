@@ -282,7 +282,7 @@ router.get('/registrations', async (req, res) => {
     );
 
     // Get registrations with event and user info
-    // Use event_registrations table (main table) with fallback to users table
+    // event_registrations table doesn't have full_name, email, phone - get from users table
     const [registrations] = await query(
       `SELECT r.*, 
               e.title as event_title, 
@@ -293,14 +293,13 @@ router.get('/registrations', async (req, res) => {
               u.full_name as user_name, 
               u.email as user_email,
               u.phone as user_phone,
-              -- Use event_registrations columns if they exist, otherwise use users table
-              COALESCE(r.full_name, u.full_name) as full_name,
-              COALESCE(r.email, u.email) as email,
-              COALESCE(r.phone, u.phone) as phone,
-              r.address,
-              r.city,
-              r.province,
-              r.institution,
+              u.full_name as full_name,
+              u.email as email,
+              u.phone as phone,
+              u.address,
+              u.city,
+              u.province,
+              u.institution,
               r.notes
        FROM event_registrations r
        LEFT JOIN events e ON r.event_id = e.id
